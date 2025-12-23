@@ -1,0 +1,17 @@
+# ADC Project - Pin Constraints
+# Target: Nandland Go Board (iCE40HX1K-VQ100)
+
+# Clock - 25 MHz
+set_io clk 15
+
+# Trigger input (rising edge starts sweep)
+set_io trigger_in 54    # Switch 3
+
+# ADC SPI (AD7476A) - PMOD connector (bottom row)
+set_io adc_cs_n  78     # PMOD 7
+set_io adc_sclk  79     # PMOD 8
+set_io adc_miso  80     # PMOD 9
+
+# Status outputs - LEDs
+set_io busy 59          # LED 3
+set_io done 60          # LED 4
