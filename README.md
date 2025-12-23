@@ -1,12 +1,15 @@
 # Lattice iCE40 FPGA Projects
 
-Minimal example projects for the Nandland Go Board.
+Minimal example projects for Lattice iCE40 development boards.
 
 ## Hardware
 
-- **FPGA**: iCE40 HX1K (VQ100 package)
-- **Clock**: 25 MHz
-- **Toolchain**: yosys, nextpnr-ice40, iceprog
+| Board | FPGA | Package | Clock |
+|-------|------|---------|-------|
+| Nandland Go Board | iCE40 HX1K | VQ100 | 25 MHz |
+| iCEBreaker v1.1 | iCE40UP5K | QFN48 | 12 MHz |
+
+**Toolchain**: yosys, nextpnr-ice40, iceprog
 
 ## Projects
 
