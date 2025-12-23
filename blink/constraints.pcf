@@ -1,0 +1,11 @@
+# Nandland Go Board - Blink constraints
+# iCE40HX1K-VQ100
+
+# 25MHz Clock
+set_io i_Clk 15
+
+# LEDs
+set_io o_LED_1 56
+set_io o_LED_2 57
+set_io o_LED_3 59
+set_io o_LED_4 60

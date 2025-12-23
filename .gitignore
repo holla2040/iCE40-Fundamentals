@@ -1,0 +1,16 @@
+# FPGA Build Artifacts
+*.bin
+*.asc
+*.blif
+*.json
+*.out
+
+# Scons
+.sconsign.dblite
+
+# Local settings
+.claude/settings.local.json
+
+# Editor backup files
+*~
+*.swp

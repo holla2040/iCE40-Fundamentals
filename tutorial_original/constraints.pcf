@@ -1,0 +1,15 @@
+# tutorial_led_blink constraints for Nandland Go Board
+# iCE40HX1K-VQ100
+
+# 25MHz Clock
+set_io i_clock 15
+
+# Enable (active high) - Switch 1
+set_io i_enable 53
+
+# Frequency select switches
+set_io i_switch_1 51
+set_io i_switch_2 54
+
+# LED output
+set_io o_led_drive 56
