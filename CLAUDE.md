@@ -30,6 +30,10 @@ make clean  # Remove build artifacts
 set_io signal_name pin_number
 ```
 
+## Code Style
+
+- **Indentation**: 2 spaces (no tabs)
+
 ## Development Rules
 
 IMPORTANT: After ANY Verilog (.v) or constraint (.pcf) changes, run `make` in the project directory to verify compilation succeeds. Do not consider a change complete until it compiles without errors.
