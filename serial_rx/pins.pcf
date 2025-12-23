@@ -1,0 +1,11 @@
+# Pin constraints for Serial UART RX project
+# Nandland Go Board (iCE40HX1K-VQ100)
+
+# 25 MHz Clock
+set_io i_Clk 15
+
+# UART RX (from FTDI USB chip)
+set_io i_UART_RX 73
+
+# LED
+set_io o_LED_1 56

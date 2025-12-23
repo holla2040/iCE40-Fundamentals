@@ -18,7 +18,8 @@ Minimal example projects for Lattice iCE40 development boards.
 | `adc/` | AD7476A 12-bit ADC SPI master |
 | `blink/` | LED blinker |
 | `dac/` | DAC121S101 12-bit DAC SPI master |
-| `serial/` | UART TX at 115200 baud |
+| `serial_tx/` | UART TX at 115200 baud |
+| `serial_rx/` | UART RX at 115200 baud |
 
 ## Build
 
