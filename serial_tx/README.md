@@ -1,6 +1,6 @@
-# Serial
+# Serial TX
 
-UART transmitter at 115200 baud, 8N1. Sends "Hello from FPGA!" every second over USB.
+UART transmitter at 115200 baud, 8N1. Sends "Hello from FPGA!" every second over USB with an alternating marker (`.` or `-`) to indicate message sequence.
 
 ## Pins
 
