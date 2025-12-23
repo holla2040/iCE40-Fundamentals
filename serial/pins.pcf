@@ -1,14 +1,8 @@
 # Pin constraints for Serial UART project
 # Nandland Go Board (iCE40HX1K-VQ100)
 
-# 12 MHz Clock
+# 25 MHz Clock
 set_io i_Clk 15
 
 # UART (directly to FTDI USB chip)
 set_io o_UART_TX 74
-
-# LEDs (accent activity indicator)
-set_io o_LED_1 56
-set_io o_LED_2 57
-set_io o_LED_3 59
-set_io o_LED_4 60

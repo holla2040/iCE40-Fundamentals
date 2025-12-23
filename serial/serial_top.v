@@ -4,11 +4,7 @@
 
 module top (
     input  wire i_Clk,
-    output wire o_UART_TX,
-    output wire o_LED_1,
-    output wire o_LED_2,
-    output wire o_LED_3,
-    output wire o_LED_4
+    output wire o_UART_TX
 );
 
     // Message to send (including CR+LF)
@@ -70,7 +66,6 @@ module top (
     reg [2:0]  state = WAIT_DELAY;
     reg [4:0]  char_index = 0;
     reg [24:0] delay_count = 0;
-    reg [7:0]  send_count = 0;  // Count messages sent
 
     // Delay between messages: ~1 second at 25 MHz
     localparam DELAY_1SEC = 25'd25_000_000;
@@ -82,7 +77,6 @@ module top (
             delay_count <= 0;
             tx_start    <= 0;
             tx_data     <= 0;
-            send_count  <= 0;
         end else begin
             tx_start <= 0;  // Default: no start pulse
 
@@ -102,8 +96,7 @@ module top (
                         tx_data <= message[char_index];
                         state   <= SEND_CHAR;
                     end else begin
-                        send_count <= send_count + 1;
-                        state      <= WAIT_DELAY;
+                        state <= WAIT_DELAY;
                     end
                 end
 
@@ -128,11 +121,5 @@ module top (
             endcase
         end
     end
-
-    // LED output: show message count on LEDs (binary)
-    assign o_LED_1 = send_count[0];
-    assign o_LED_2 = send_count[1];
-    assign o_LED_3 = send_count[2];
-    assign o_LED_4 = send_count[3];
 
 endmodule
