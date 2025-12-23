@@ -22,6 +22,7 @@ Minimal example projects for Lattice iCE40 development boards.
 | `serial_rx/` | UART RX at 115200 baud |
 | `serial_echo/` | UART echo (RX + TX combined) |
 | `button_debounce/` | Button debounce demo with 7-seg display |
+| `pwm_led/` | PWM LED fader |
 
 ## Build
 

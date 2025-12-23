@@ -1,0 +1,8 @@
+# PWM LED Fader - Pin Constraints
+# Nandland Go Board (iCE40 HX1K-VQ100)
+
+# Clock
+set_io i_Clk 15
+
+# LED
+set_io o_LED_1 56

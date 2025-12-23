@@ -1,0 +1,20 @@
+# ADS1115 I2C ADC - Pin Constraints
+# Nandland Go Board (iCE40 HX1K-VQ100)
+
+# Clock
+set_io i_Clk 15
+
+# I2C (PMOD connector)
+# Pin 2 = 64, Pin 3 = 63, Pin 4 = 62
+set_io o_ADDR    64
+set_io io_I2C_SDA 63
+set_io io_I2C_SCL 62
+
+# UART TX (USB serial)
+set_io o_UART_TX 74
+
+# Status LEDs
+set_io o_LED_1 56
+set_io o_LED_2 57
+set_io o_LED_3 59
+set_io o_LED_4 60
