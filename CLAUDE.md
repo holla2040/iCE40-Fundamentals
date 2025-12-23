@@ -10,7 +10,7 @@
 - **FPGA**: iCE40 HX1K
 - **Package**: VQ100
 - **Board**: Nandland Go Board
-- **Clock**: 12 MHz
+- **Clock**: 25 MHz
 
 ## Project Structure
 Each project directory contains:
