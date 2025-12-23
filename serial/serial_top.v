@@ -7,9 +7,9 @@ module top (
     output wire o_UART_TX
 );
 
-    // Message to send (including CR+LF)
-    localparam MSG_LEN = 18;
-    reg [7:0] message [0:MSG_LEN-1];
+    // Message to send: "Hello from FPGA!" + marker + CR + LF
+    localparam MSG_LEN = 19;
+    reg [7:0] message [0:15];  // Base message without marker/CR/LF
     initial begin
         message[0]  = "H";
         message[1]  = "e";
@@ -27,9 +27,10 @@ module top (
         message[13] = "G";
         message[14] = "A";
         message[15] = "!";
-        message[16] = 8'h0D;  // CR
-        message[17] = 8'h0A;  // LF
     end
+
+    // Even/odd toggle: dot on even, dash on odd
+    reg toggle = 0;
 
     // Reset generation (simple power-on reset)
     reg [3:0] rst_count = 4'hF;
@@ -77,6 +78,7 @@ module top (
             delay_count <= 0;
             tx_start    <= 0;
             tx_data     <= 0;
+            toggle      <= 0;
         end else begin
             tx_start <= 0;  // Default: no start pulse
 
@@ -92,11 +94,21 @@ module top (
                 end
 
                 LOAD_CHAR: begin
-                    if (char_index < MSG_LEN) begin
+                    if (char_index < 16) begin
                         tx_data <= message[char_index];
                         state   <= SEND_CHAR;
+                    end else if (char_index == 16) begin
+                        tx_data <= toggle ? "-" : ".";
+                        state   <= SEND_CHAR;
+                    end else if (char_index == 17) begin
+                        tx_data <= 8'h0D;  // CR
+                        state   <= SEND_CHAR;
+                    end else if (char_index == 18) begin
+                        tx_data <= 8'h0A;  // LF
+                        state   <= SEND_CHAR;
                     end else begin
-                        state <= WAIT_DELAY;
+                        toggle <= ~toggle;
+                        state  <= WAIT_DELAY;
                     end
                 end
 
