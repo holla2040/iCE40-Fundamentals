@@ -9,36 +9,36 @@ module top (
 );
 
   // Reset generation
-  reg [3:0] rst_count = 4'hF;
-  wire rst = rst_count != 0;
+  reg [3:0] r_rst_count = 4'hF;
+  wire w_rst = r_rst_count != 0;
   always @(posedge i_Clk) begin
-    if (rst_count != 0)
-      rst_count <= rst_count - 1;
+    if (r_rst_count != 0)
+      r_rst_count <= r_rst_count - 1;
   end
 
   // UART receiver
-  wire [7:0] rx_data;
-  wire       rx_valid;
+  wire [7:0] w_rx_data;
+  wire       w_rx_valid;
 
   uart_rx #(
     .CLK_FREQ(25_000_000),
     .BAUD(115200)
   ) uart_inst (
-    .clk(i_Clk),
-    .rst(rst),
-    .rx_in(i_UART_RX),
-    .rx_data(rx_data),
-    .rx_valid(rx_valid)
+    .i_clk(i_Clk),
+    .i_rst(w_rst),
+    .i_rx_in(i_UART_RX),
+    .o_rx_data(w_rx_data),
+    .o_rx_valid(w_rx_valid)
   );
 
   // LED control: '0' = off, '1' = on
   always @(posedge i_Clk) begin
-    if (rst) begin
+    if (w_rst) begin
       o_LED_1 <= 0;
-    end else if (rx_valid) begin
-      if (rx_data == "0")
+    end else if (w_rx_valid) begin
+      if (w_rx_data == "0")
         o_LED_1 <= 0;
-      else if (rx_data == "1")
+      else if (w_rx_data == "1")
         o_LED_1 <= 1;
     end
   end

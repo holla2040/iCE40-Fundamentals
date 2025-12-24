@@ -36,11 +36,12 @@ Every Verilog design starts with a `module`. Think of it like a function definit
 ### Registers
 
 ```verilog
-reg [32:0] counter = 0;
+reg [32:0] r_counter = 0;
 ```
 
 A `reg` (register) stores a value. Unlike a wire, it remembers its value between clock cycles.
 
+- `r_` prefix indicates this is a register (per project style guide)
 - `[32:0]` means 33 bits wide (bits 32 down to 0)
 - `= 0` initializes it to zero at startup
 
@@ -50,7 +51,7 @@ A `reg` (register) stores a value. Unlike a wire, it remembers its value between
 
 ```verilog
 always @(posedge i_Clk) begin
-  counter <= counter + 1;
+  r_counter <= r_counter + 1;
 end
 ```
 
@@ -64,15 +65,15 @@ This is the heart of synchronous digital design:
 ### Continuous Assignment
 
 ```verilog
-assign o_LED_1 = counter[26];
-assign o_LED_2 = counter[25];
-assign o_LED_3 = counter[24];
-assign o_LED_4 = counter[23];
+assign o_LED_1 = r_counter[26];
+assign o_LED_2 = r_counter[25];
+assign o_LED_3 = r_counter[24];
+assign o_LED_4 = r_counter[23];
 ```
 
 `assign` creates a permanent connection - the output always equals the right side.
 
-**Bit slicing** `counter[26]` extracts just bit 26 from the counter. Each bit toggles at a different rate:
+**Bit slicing** `r_counter[26]` extracts just bit 26 from the counter. Each bit toggles at a different rate:
 
 | Bit | Toggles Every | Period | Frequency |
 |-----|---------------|--------|-----------|

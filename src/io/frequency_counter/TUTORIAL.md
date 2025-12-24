@@ -45,26 +45,27 @@ Result: 5 Hz
 ```verilog
 localparam GATE_CYCLES = CLK_FREQ - 1;  // 24,999,999 for 25 MHz
 
-always @(posedge clk) begin
-  if (gate_done) begin
+always @(posedge i_clk) begin
+  if (w_gate_done) begin
     // Gate complete - save count and restart
-    count_out  <= freq_count;
-    count_valid <= 1'b1;
-    freq_count <= rising_edge ? 32'd1 : 32'd0;
-    gate_timer <= 0;
+    o_count     <= r_freq_count;
+    o_valid     <= 1'b1;
+    r_freq_count <= w_rising_edge ? 32'd1 : 32'd0;
+    r_gate_timer <= 0;
   end else begin
     // Continue counting
-    gate_timer <= gate_timer + 1;
-    if (rising_edge)
-      freq_count <= freq_count + 1;
+    r_gate_timer <= r_gate_timer + 1;
+    if (w_rising_edge)
+      r_freq_count <= r_freq_count + 1;
   end
 end
 ```
 
 Key points:
-- `gate_timer` counts from 0 to 24,999,999 (1 second at 25 MHz)
-- `freq_count` increments on each rising edge during the gate
+- `r_gate_timer` counts from 0 to 24,999,999 (1 second at 25 MHz)
+- `r_freq_count` increments on each rising edge during the gate
 - When gate completes, we save the count and restart immediately
+- Note the naming: `r_` for registers, `w_` for wires, `i_`/`o_` for ports
 
 ## Why Input Synchronization Matters
 
@@ -73,11 +74,11 @@ External signals are asynchronous to the FPGA clock. Without synchronization, th
 ### The 2-Flip-Flop Synchronizer
 
 ```verilog
-reg [1:0] sync_ff;
-wire freq_sync = sync_ff[1];
+reg [1:0] r_sync_ff;
+wire w_freq_sync = r_sync_ff[1];
 
-always @(posedge clk) begin
-  sync_ff <= {sync_ff[0], freq_in};
+always @(posedge i_clk) begin
+  r_sync_ff <= {r_sync_ff[0], i_freq};
 end
 ```
 
@@ -96,18 +97,18 @@ The first flip-flop may go metastable, but it has one full clock cycle to settle
 To count frequency, we need to detect rising edges (not just high levels):
 
 ```verilog
-reg freq_prev;
-wire rising_edge = freq_sync && !freq_prev;
+reg r_freq_prev;
+wire w_rising_edge = w_freq_sync && !r_freq_prev;
 
-always @(posedge clk) begin
-  freq_prev <= freq_sync;
+always @(posedge i_clk) begin
+  r_freq_prev <= w_freq_sync;
 end
 ```
 
 ```
-freq_sync:   ___┌───────────┐___
-freq_prev:   _____┌───────────┐_  (delayed 1 clock)
-rising_edge: ___┌─┐_____________  (pulse for 1 clock)
+w_freq_sync:   ___┌───────────┐___
+r_freq_prev:   _____┌───────────┐_  (delayed 1 clock)
+w_rising_edge: ___┌─┐_____________  (pulse for 1 clock)
 ```
 
 ## Binary to Decimal Without Division
@@ -176,19 +177,19 @@ Sending multiple characters requires careful handshaking with the UART module.
 
 ```verilog
 ST_TX_DIGIT: begin
-  if (!tx_busy && !tx_start) begin     // Wait for TX ready
-    tx_data  <= digits[digit_idx];      // Load character
-    tx_start <= 1'b1;                   // Start transmission
-    state    <= ST_TX_WAIT;             // Wait for completion
+  if (!w_tx_busy && !r_tx_start) begin   // Wait for TX ready
+    r_tx_data  <= r_digits[r_digit_idx]; // Load character
+    r_tx_start <= 1'b1;                  // Start transmission
+    r_state    <= ST_TX_WAIT;            // Wait for completion
   end
 end
 
 ST_TX_WAIT: begin
-  if (tx_busy) begin
+  if (w_tx_busy) begin
     // TX is active, wait
-  end else if (!tx_start) begin
+  end else if (!r_tx_start) begin
     // TX complete, continue
-    state <= next_state;
+    r_state <= r_next_state;
   end
 end
 ```

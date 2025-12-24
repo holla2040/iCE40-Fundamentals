@@ -22,59 +22,59 @@ module top (
 );
 
   // Reset generator
-  reg [7:0] reset_cnt = 8'd0;
-  wire rst_n = reset_cnt[7];
+  reg [7:0] r_reset_cnt = 8'd0;
+  wire w_rst_n = r_reset_cnt[7];
 
   always @(posedge i_Clk) begin
-    if (!reset_cnt[7])
-      reset_cnt <= reset_cnt + 1;
+    if (!r_reset_cnt[7])
+      r_reset_cnt <= r_reset_cnt + 1;
   end
 
   // Trigger edge detect
-  reg [2:0] trigger_sync;
+  reg [2:0] r_trigger_sync;
   always @(posedge i_Clk) begin
-    trigger_sync <= {trigger_sync[1:0], i_Switch_3};
+    r_trigger_sync <= {r_trigger_sync[1:0], i_Switch_3};
   end
-  wire trigger_rise = (trigger_sync[2:1] == 2'b01);
+  wire w_trigger_rise = (r_trigger_sync[2:1] == 2'b01);
 
   // Sweep control
-  wire busy, done;
-  wire sweep_start = trigger_rise && !busy;
-  wire adc_start;
-  wire [11:0] adc_data;
-  wire adc_done;
+  wire w_busy, w_done;
+  wire w_sweep_start = w_trigger_rise && !w_busy;
+  wire w_adc_start;
+  wire [11:0] w_adc_data;
+  wire w_adc_done;
 
   // Map to LED outputs
-  assign o_LED_3 = busy;
-  assign o_LED_4 = done;
+  assign o_LED_3 = w_busy;
+  assign o_LED_4 = w_done;
 
   // ADC Sweep Controller
   adc_sweep u_sweep (
-    .clk      (i_Clk),
-    .rst_n    (rst_n),
-    .start    (sweep_start),
-    .busy     (busy),
-    .done     (done),
-    .adc_start(adc_start),
-    .adc_data (adc_data),
-    .adc_done (adc_done)
+    .i_clk      (i_Clk),
+    .i_rst_n    (w_rst_n),
+    .i_start    (w_sweep_start),
+    .o_busy     (w_busy),
+    .o_done     (w_done),
+    .o_adc_start(w_adc_start),
+    .i_adc_data (w_adc_data),
+    .i_adc_done (w_adc_done)
   );
 
   // Internal SPI signals
-  wire adc_cs_n, adc_sclk;
-  assign io_PMOD_7 = adc_cs_n;
-  assign io_PMOD_8 = adc_sclk;
+  wire w_adc_cs_n, w_adc_sclk;
+  assign io_PMOD_7 = w_adc_cs_n;
+  assign io_PMOD_8 = w_adc_sclk;
 
   // ADC SPI Master
   adc_spi u_adc (
-    .clk      (i_Clk),
-    .rst_n    (rst_n),
-    .start    (adc_start),
-    .data     (adc_data),
-    .done     (adc_done),
-    .adc_cs_n (adc_cs_n),
-    .adc_sclk (adc_sclk),
-    .adc_miso (io_PMOD_9)
+    .i_clk      (i_Clk),
+    .i_rst_n    (w_rst_n),
+    .i_start    (w_adc_start),
+    .o_data     (w_adc_data),
+    .o_done     (w_adc_done),
+    .o_adc_cs_n (w_adc_cs_n),
+    .o_adc_sclk (w_adc_sclk),
+    .i_adc_miso (io_PMOD_9)
   );
 
 endmodule
@@ -86,16 +86,16 @@ endmodule
 module adc_sweep #(
   parameter NUM_POINTS = 200
 )(
-  input  wire        clk,
-  input  wire        rst_n,
-  
-  input  wire        start,
-  output reg         busy,
-  output reg         done,
-  
-  output reg         adc_start,
-  input  wire [11:0] adc_data,
-  input  wire        adc_done
+  input  wire        i_clk,
+  input  wire        i_rst_n,
+
+  input  wire        i_start,
+  output reg         o_busy,
+  output reg         o_done,
+
+  output reg         o_adc_start,
+  input  wire [11:0] i_adc_data,
+  input  wire        i_adc_done
 );
 
   // State machine
@@ -103,70 +103,72 @@ module adc_sweep #(
   localparam READ_ADC = 2'd1;
   localparam WAIT_ADC = 2'd2;
   localparam STORE    = 2'd3;
-  
-  reg [1:0] state;
-  reg [7:0] point_index;
+
+  reg [1:0] r_state;
+  reg [7:0] r_point_index;
 
   // ADC result memory (200 x 12-bit)
-  reg [11:0] adc_memory [0:NUM_POINTS-1];
-  
+  reg [11:0] r_adc_memory [0:NUM_POINTS-1];
+
   // Memory write
-  reg mem_wr_en;
-  reg [11:0] captured_data;
-  
-  always @(posedge clk) begin
-    if (mem_wr_en)
-      adc_memory[point_index] <= captured_data;
+  reg r_mem_wr_en;
+  reg [11:0] r_captured_data;
+
+  always @(posedge i_clk) begin
+    if (r_mem_wr_en)
+      r_adc_memory[r_point_index] <= r_captured_data;
   end
 
-  // State machine
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      state         <= IDLE;
-      busy          <= 1'b0;
-      done          <= 1'b0;
-      adc_start     <= 1'b0;
-      point_index   <= 8'd0;
-      mem_wr_en     <= 1'b0;
-      captured_data <= 12'd0;
+  // State machine (synchronous reset)
+  always @(posedge i_clk) begin
+    if (!i_rst_n) begin
+      r_state         <= IDLE;
+      o_busy          <= 1'b0;
+      o_done          <= 1'b0;
+      o_adc_start     <= 1'b0;
+      r_point_index   <= 8'd0;
+      r_mem_wr_en     <= 1'b0;
+      r_captured_data <= 12'd0;
     end else begin
-      adc_start <= 1'b0;
-      done      <= 1'b0;
-      mem_wr_en <= 1'b0;
-      
-      case (state)
+      o_adc_start <= 1'b0;
+      o_done      <= 1'b0;
+      r_mem_wr_en <= 1'b0;
+
+      case (r_state)
         IDLE: begin
-          busy <= 1'b0;
-          if (start) begin
-            busy        <= 1'b1;
-            point_index <= 8'd0;
-            state       <= READ_ADC;
+          o_busy <= 1'b0;
+          if (i_start) begin
+            o_busy        <= 1'b1;
+            r_point_index <= 8'd0;
+            r_state       <= READ_ADC;
           end
         end
-        
+
         READ_ADC: begin
-          adc_start <= 1'b1;
-          state     <= WAIT_ADC;
+          o_adc_start <= 1'b1;
+          r_state     <= WAIT_ADC;
         end
-        
+
         WAIT_ADC: begin
-          if (adc_done) begin
-            captured_data <= adc_data;
-            state         <= STORE;
+          if (i_adc_done) begin
+            r_captured_data <= i_adc_data;
+            r_state         <= STORE;
           end
         end
-        
+
         STORE: begin
-          mem_wr_en <= 1'b1;
-          
-          if (point_index == (NUM_POINTS - 1)) begin
-            done  <= 1'b1;
-            state <= IDLE;
+          r_mem_wr_en <= 1'b1;
+
+          if (r_point_index == (NUM_POINTS - 1)) begin
+            o_done  <= 1'b1;
+            r_state <= IDLE;
           end else begin
-            point_index <= point_index + 1;
-            state       <= READ_ADC;
+            r_point_index <= r_point_index + 1;
+            r_state       <= READ_ADC;
           end
         end
+
+        default: r_state <= IDLE;
       endcase
     end
   end
@@ -187,86 +189,89 @@ endmodule
 module adc_spi #(
   parameter CLK_DIV = 2  // 12 MHz / 2 = 6 MHz SCLK
 )(
-  input  wire        clk,
-  input  wire        rst_n,
-  
-  input  wire        start,
-  output reg  [11:0] data,
-  output reg         done,
-  
-  output reg         adc_cs_n,
-  output reg         adc_sclk,
-  input  wire        adc_miso
+  input  wire        i_clk,
+  input  wire        i_rst_n,
+
+  input  wire        i_start,
+  output reg  [11:0] o_data,
+  output reg         o_done,
+
+  output reg         o_adc_cs_n,
+  output reg         o_adc_sclk,
+  input  wire        i_adc_miso
 );
 
   localparam IDLE  = 2'd0;
   localparam SHIFT = 2'd1;
   localparam DONE  = 2'd2;
-  
-  reg [1:0]  state;
-  reg [4:0]  bit_cnt;
-  reg [15:0] shift_reg;
-  reg [3:0]  clk_cnt;
+
+  reg [1:0]  r_state;
+  reg [4:0]  r_bit_cnt;
+  reg [15:0] r_shift_reg;
+  reg [3:0]  r_clk_cnt;
 
   // Synchronize MISO
-  reg [1:0] miso_sync;
-  always @(posedge clk) begin
-    miso_sync <= {miso_sync[0], adc_miso};
+  reg [1:0] r_miso_sync;
+  always @(posedge i_clk) begin
+    r_miso_sync <= {r_miso_sync[0], i_adc_miso};
   end
-  wire miso_in = miso_sync[1];
+  wire w_miso_in = r_miso_sync[1];
 
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      state     <= IDLE;
-      adc_cs_n  <= 1'b1;
-      adc_sclk  <= 1'b0;
-      data      <= 12'd0;
-      done      <= 1'b0;
-      bit_cnt   <= 5'd0;
-      shift_reg <= 16'd0;
-      clk_cnt   <= 4'd0;
+  // State machine (synchronous reset)
+  always @(posedge i_clk) begin
+    if (!i_rst_n) begin
+      r_state     <= IDLE;
+      o_adc_cs_n  <= 1'b1;
+      o_adc_sclk  <= 1'b0;
+      o_data      <= 12'd0;
+      o_done      <= 1'b0;
+      r_bit_cnt   <= 5'd0;
+      r_shift_reg <= 16'd0;
+      r_clk_cnt   <= 4'd0;
     end else begin
-      done <= 1'b0;
-      
-      case (state)
+      o_done <= 1'b0;
+
+      case (r_state)
         IDLE: begin
-          adc_cs_n <= 1'b1;
-          adc_sclk <= 1'b0;
-          if (start) begin
-            shift_reg <= 16'd0;
-            bit_cnt   <= 5'd16;
-            adc_cs_n  <= 1'b0;
-            clk_cnt   <= 4'd0;
-            state     <= SHIFT;
+          o_adc_cs_n <= 1'b1;
+          o_adc_sclk <= 1'b0;
+          if (i_start) begin
+            r_shift_reg <= 16'd0;
+            r_bit_cnt   <= 5'd16;
+            o_adc_cs_n  <= 1'b0;
+            r_clk_cnt   <= 4'd0;
+            r_state     <= SHIFT;
           end
         end
-        
+
         SHIFT: begin
-          clk_cnt <= clk_cnt + 1;
-          if (clk_cnt == CLK_DIV - 1) begin
-            clk_cnt  <= 4'd0;
-            adc_sclk <= ~adc_sclk;
-            
+          r_clk_cnt <= r_clk_cnt + 1;
+          if (r_clk_cnt == CLK_DIV - 1) begin
+            r_clk_cnt  <= 4'd0;
+            o_adc_sclk <= ~o_adc_sclk;
+
             // Sample on rising edge
-            if (!adc_sclk) begin
-              shift_reg <= {shift_reg[14:0], miso_in};
-              bit_cnt   <= bit_cnt - 1;
-              
-              if (bit_cnt == 1) begin
-                state <= DONE;
+            if (!o_adc_sclk) begin
+              r_shift_reg <= {r_shift_reg[14:0], w_miso_in};
+              r_bit_cnt   <= r_bit_cnt - 1;
+
+              if (r_bit_cnt == 1) begin
+                r_state <= DONE;
               end
             end
           end
         end
-        
+
         DONE: begin
-          adc_cs_n <= 1'b1;
-          adc_sclk <= 1'b0;
+          o_adc_cs_n <= 1'b1;
+          o_adc_sclk <= 1'b0;
           // AD7476A format: [0][0][0][0][D11:D0]
-          data     <= shift_reg[11:0];
-          done     <= 1'b1;
-          state    <= IDLE;
+          o_data     <= r_shift_reg[11:0];
+          o_done     <= 1'b1;
+          r_state    <= IDLE;
         end
+
+        default: r_state <= IDLE;
       endcase
     end
   end

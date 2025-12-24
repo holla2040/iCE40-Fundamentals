@@ -10,38 +10,38 @@ module top (
 );
 
   // Reset generation
-  reg [3:0] rst_count = 4'hF;
-  wire rst = rst_count != 0;
+  reg [3:0] r_rst_count = 4'hF;
+  wire w_rst = r_rst_count != 0;
   always @(posedge i_Clk) begin
-    if (rst_count != 0)
-      rst_count <= rst_count - 1;
+    if (r_rst_count != 0)
+      r_rst_count <= r_rst_count - 1;
   end
 
   // UART RX signals
-  wire [7:0] rx_data;
-  wire       rx_valid;
+  wire [7:0] w_rx_data;
+  wire       w_rx_valid;
 
   // Swap case: lowercase -> uppercase, uppercase -> lowercase
-  wire is_lower = (rx_data >= "a") && (rx_data <= "z");
-  wire is_upper = (rx_data >= "A") && (rx_data <= "Z");
-  wire [7:0] rx_swapped = is_lower ? (rx_data - 8'h20) :
-                          is_upper ? (rx_data + 8'h20) : rx_data;
+  wire w_is_lower = (w_rx_data >= "a") && (w_rx_data <= "z");
+  wire w_is_upper = (w_rx_data >= "A") && (w_rx_data <= "Z");
+  wire [7:0] w_rx_swapped = w_is_lower ? (w_rx_data - 8'h20) :
+                            w_is_upper ? (w_rx_data + 8'h20) : w_rx_data;
 
   // UART TX signals
-  reg  [7:0] tx_data;
-  reg        tx_start;
-  wire       tx_busy;
+  reg  [7:0] r_tx_data;
+  reg        r_tx_start;
+  wire       w_tx_busy;
 
   // UART Receiver
   uart_rx #(
     .CLK_FREQ(25_000_000),
     .BAUD(115200)
   ) rx_inst (
-    .clk(i_Clk),
-    .rst(rst),
-    .rx_in(i_UART_RX),
-    .rx_data(rx_data),
-    .rx_valid(rx_valid)
+    .i_clk(i_Clk),
+    .i_rst(w_rst),
+    .i_rx_in(i_UART_RX),
+    .o_rx_data(w_rx_data),
+    .o_rx_valid(w_rx_valid)
   );
 
   // UART Transmitter
@@ -49,17 +49,17 @@ module top (
     .CLK_FREQ(25_000_000),
     .BAUD(115200)
   ) tx_inst (
-    .clk(i_Clk),
-    .rst(rst),
-    .tx_data(tx_data),
-    .tx_start(tx_start),
-    .tx_out(o_UART_TX),
-    .tx_busy(tx_busy)
+    .i_clk(i_Clk),
+    .i_rst(w_rst),
+    .i_tx_data(r_tx_data),
+    .i_tx_start(r_tx_start),
+    .o_tx_out(o_UART_TX),
+    .o_tx_busy(w_tx_busy)
   );
 
   // Detect special characters
-  wire is_backspace = (rx_data == 8'h08) || (rx_data == 8'h7F);  // BS or DEL
-  wire is_cr = (rx_data == 8'h0D);
+  wire w_is_backspace = (w_rx_data == 8'h08) || (w_rx_data == 8'h7F);  // BS or DEL
+  wire w_is_cr = (w_rx_data == 8'h0D);
 
   // Echo state machine
   localparam IDLE    = 3'd0;
@@ -68,113 +68,113 @@ module top (
   localparam SEND_LF = 3'd3;  // Send LF after CR
   localparam SEND_BS = 3'd4;  // Backspace sequence: BS, Space, BS
 
-  reg [2:0] state = IDLE;
-  reg [7:0] echo_data;
-  reg       need_lf;     // Flag: need to send LF after current char
-  reg [1:0] bs_step;     // Backspace sequence step (0=BS, 1=Space, 2=BS)
-  reg       tx_pending;  // TX initiated, waiting for completion
-  reg       tx_was_busy; // tx_busy has been seen high since tx_start
+  reg [2:0] r_state = IDLE;
+  reg [7:0] r_echo_data;
+  reg       r_need_lf;     // Flag: need to send LF after current char
+  reg [1:0] r_bs_step;     // Backspace sequence step (0=BS, 1=Space, 2=BS)
+  reg       r_tx_pending;  // TX initiated, waiting for completion
+  reg       r_tx_was_busy; // w_tx_busy has been seen high since r_tx_start
 
   always @(posedge i_Clk) begin
-    if (rst) begin
-      state       <= IDLE;
-      tx_start    <= 0;
-      tx_data     <= 0;
-      echo_data   <= 0;
-      need_lf     <= 0;
-      bs_step     <= 0;
-      tx_pending  <= 0;
-      tx_was_busy <= 0;
+    if (w_rst) begin
+      r_state       <= IDLE;
+      r_tx_start    <= 0;
+      r_tx_data     <= 0;
+      r_echo_data   <= 0;
+      r_need_lf     <= 0;
+      r_bs_step     <= 0;
+      r_tx_pending  <= 0;
+      r_tx_was_busy <= 0;
     end else begin
-      tx_start <= 0;
+      r_tx_start <= 0;
 
-      case (state)
+      case (r_state)
         IDLE: begin
-          if (rx_valid) begin
-            if (is_backspace) begin
-              bs_step <= 0;
-              state   <= SEND_BS;
+          if (w_rx_valid) begin
+            if (w_is_backspace) begin
+              r_bs_step <= 0;
+              r_state   <= SEND_BS;
             end else begin
-              echo_data <= rx_swapped;
-              need_lf   <= is_cr;
-              state     <= WAIT_TX;
+              r_echo_data <= w_rx_swapped;
+              r_need_lf   <= w_is_cr;
+              r_state     <= WAIT_TX;
             end
           end
         end
 
         WAIT_TX: begin
-          if (!tx_busy) begin
-            tx_data  <= echo_data;
-            tx_start <= 1;
-            state    <= SENDING;
+          if (!w_tx_busy) begin
+            r_tx_data  <= r_echo_data;
+            r_tx_start <= 1;
+            r_state    <= SENDING;
           end
         end
 
         SENDING: begin
-          if (tx_busy) begin
+          if (w_tx_busy) begin
             // TX started, wait for completion
           end else begin
-            if (need_lf) begin
-              state <= SEND_LF;
+            if (r_need_lf) begin
+              r_state <= SEND_LF;
             end else begin
-              state <= IDLE;
+              r_state <= IDLE;
             end
           end
         end
 
         SEND_LF: begin
-          if (!tx_busy) begin
-            tx_data  <= 8'h0A;  // LF
-            tx_start <= 1;
-            need_lf  <= 0;
-            state    <= SENDING;
+          if (!w_tx_busy) begin
+            r_tx_data  <= 8'h0A;  // LF
+            r_tx_start <= 1;
+            r_need_lf  <= 0;
+            r_state    <= SENDING;
           end
         end
 
         SEND_BS: begin
-          if (tx_pending) begin
-            // Track when tx_busy goes high
-            if (tx_busy)
-              tx_was_busy <= 1;
-            // TX complete when tx_busy seen high then goes low
-            if (tx_was_busy && !tx_busy) begin
-              tx_pending  <= 0;
-              tx_was_busy <= 0;
-              bs_step     <= bs_step + 1;
+          if (r_tx_pending) begin
+            // Track when w_tx_busy goes high
+            if (w_tx_busy)
+              r_tx_was_busy <= 1;
+            // TX complete when w_tx_busy seen high then goes low
+            if (r_tx_was_busy && !w_tx_busy) begin
+              r_tx_pending  <= 0;
+              r_tx_was_busy <= 0;
+              r_bs_step     <= r_bs_step + 1;
             end
           end else begin
             // Start next character or finish
-            case (bs_step)
+            case (r_bs_step)
               2'd0: begin
-                tx_data    <= 8'h08;  // BS
-                tx_start   <= 1;
-                tx_pending <= 1;
+                r_tx_data    <= 8'h08;  // BS
+                r_tx_start   <= 1;
+                r_tx_pending <= 1;
               end
               2'd1: begin
-                tx_data    <= 8'h20;  // Space
-                tx_start   <= 1;
-                tx_pending <= 1;
+                r_tx_data    <= 8'h20;  // Space
+                r_tx_start   <= 1;
+                r_tx_pending <= 1;
               end
               2'd2: begin
-                tx_data    <= 8'h08;  // BS
-                tx_start   <= 1;
-                tx_pending <= 1;
+                r_tx_data    <= 8'h08;  // BS
+                r_tx_start   <= 1;
+                r_tx_pending <= 1;
               end
               2'd3: begin
                 // All three chars sent
-                state   <= IDLE;
-                bs_step <= 2'd0;
+                r_state   <= IDLE;
+                r_bs_step <= 2'd0;
               end
             endcase
           end
         end
 
-        default: state <= IDLE;
+        default: r_state <= IDLE;
       endcase
     end
   end
 
   // LED shows TX activity
-  assign o_LED_1 = tx_busy;
+  assign o_LED_1 = w_tx_busy;
 
 endmodule

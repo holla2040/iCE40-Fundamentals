@@ -6,8 +6,8 @@ module ads1115 #(
   parameter CLK_FREQ = 25_000_000,
   parameter I2C_FREQ = 100_000
 )(
-  input  wire        clk,
-  input  wire        rst,
+  input  wire        i_clk,
+  input  wire        i_rst,
 
   // Data output
   output reg  [15:0] o_data,       // ADC reading (signed)
@@ -55,267 +55,272 @@ module ads1115 #(
   localparam S_READ_RESTART   = 4'd6;
   localparam S_ERROR          = 4'd7;
 
-  reg [3:0] state;
-  reg [2:0] step;
-  reg [15:0] read_data;
-  reg alert_prev;
+  reg [3:0] r_state;
+  reg [2:0] r_step;
+  reg [15:0] r_read_data;
+  reg r_alert_prev;
 
   // I2C master signals
-  reg        i2c_start;
-  reg        i2c_stop;
-  reg  [6:0] i2c_addr;
-  reg        i2c_rw;
-  reg  [7:0] i2c_wdata;
-  reg        i2c_wvalid;
-  reg        i2c_rready;
-  reg        i2c_ack_send;
+  reg        r_i2c_start;
+  reg        r_i2c_stop;
+  reg  [6:0] r_i2c_addr;
+  reg        r_i2c_rw;
+  reg  [7:0] r_i2c_wdata;
+  reg        r_i2c_wvalid;
+  reg        r_i2c_rready;
+  reg        r_i2c_ack_send;
 
-  wire [7:0] i2c_rdata;
-  wire       i2c_rvalid;
-  wire       i2c_wready;
-  wire       i2c_ack_recv;
-  wire       i2c_busy;
-  wire       i2c_done;
+  wire [7:0] w_i2c_rdata;
+  wire       w_i2c_rvalid;
+  wire       w_i2c_wready;
+  wire       w_i2c_ack_recv;
+  wire       w_i2c_busy;
+  wire       w_i2c_done;
 
   i2c_master #(
     .CLK_FREQ(CLK_FREQ),
     .I2C_FREQ(I2C_FREQ)
   ) i2c (
-    .clk(clk),
-    .rst(rst),
-    .i_addr(i2c_addr),
-    .i_rw(i2c_rw),
-    .i_start(i2c_start),
-    .i_wdata(i2c_wdata),
-    .i_wvalid(i2c_wvalid),
-    .i_rready(i2c_rready),
-    .i_stop(i2c_stop),
-    .i_ack_send(i2c_ack_send),
-    .o_rdata(i2c_rdata),
-    .o_rvalid(i2c_rvalid),
-    .o_wready(i2c_wready),
-    .o_ack_recv(i2c_ack_recv),
-    .o_busy(i2c_busy),
-    .o_done(i2c_done),
+    .i_clk(i_clk),
+    .i_rst(i_rst),
+    .i_addr(r_i2c_addr),
+    .i_rw(r_i2c_rw),
+    .i_start(r_i2c_start),
+    .i_wdata(r_i2c_wdata),
+    .i_wvalid(r_i2c_wvalid),
+    .i_rready(r_i2c_rready),
+    .i_stop(r_i2c_stop),
+    .i_ack_send(r_i2c_ack_send),
+    .o_rdata(w_i2c_rdata),
+    .o_rvalid(w_i2c_rvalid),
+    .o_wready(w_i2c_wready),
+    .o_ack_recv(w_i2c_ack_recv),
+    .o_busy(w_i2c_busy),
+    .o_done(w_i2c_done),
     .o_scl(o_scl),
     .o_sda(o_sda),
     .i_sda(i_sda)
   );
 
-  always @(posedge clk) begin
-    if (rst) begin
-      state       <= S_INIT;
-      step        <= 0;
-      o_data      <= 0;
-      o_valid     <= 0;
-      o_error     <= 0;
-      read_data   <= 0;
-      alert_prev  <= 1;
-      i2c_start   <= 0;
-      i2c_stop    <= 0;
-      i2c_addr    <= 0;
-      i2c_rw      <= 0;
-      i2c_wdata   <= 0;
-      i2c_wvalid  <= 0;
-      i2c_rready  <= 0;
-      i2c_ack_send<= 0;
+  always @(posedge i_clk) begin
+    if (i_rst) begin
+      r_state        <= S_INIT;
+      r_step         <= 0;
+      o_data         <= 0;
+      o_valid        <= 0;
+      o_error        <= 0;
+      r_read_data    <= 0;
+      r_alert_prev   <= 1;
+      r_i2c_start    <= 0;
+      r_i2c_stop     <= 0;
+      r_i2c_addr     <= 0;
+      r_i2c_rw       <= 0;
+      r_i2c_wdata    <= 0;
+      r_i2c_wvalid   <= 0;
+      r_i2c_rready   <= 0;
+      r_i2c_ack_send <= 0;
     end else begin
       // Default: clear pulses
-      i2c_start  <= 0;
-      i2c_stop   <= 0;
-      i2c_wvalid <= 0;
-      i2c_rready <= 0;
-      o_valid    <= 0;
+      r_i2c_start  <= 0;
+      r_i2c_stop   <= 0;
+      r_i2c_wvalid <= 0;
+      r_i2c_rready <= 0;
+      o_valid      <= 0;
 
       // Track alert edge
-      alert_prev <= i_alert;
+      r_alert_prev <= i_alert;
 
-      case (state)
+      case (r_state)
         S_INIT: begin
-          step  <= 0;
-          state <= S_WRITE_CONFIG;
+          r_step  <= 0;
+          r_state <= S_WRITE_CONFIG;
         end
 
         S_WRITE_CONFIG: begin
-          case (step)
+          case (r_step)
             0: begin
-              i2c_addr  <= ADDR;
-              i2c_rw    <= 0;  // Write
-              i2c_start <= 1;
-              step      <= 1;
+              r_i2c_addr  <= ADDR;
+              r_i2c_rw    <= 0;  // Write
+              r_i2c_start <= 1;
+              r_step      <= 1;
             end
-            1: if (i2c_done) begin
-              if (i2c_ack_recv) begin
+            1: if (w_i2c_done) begin
+              if (w_i2c_ack_recv) begin
                 // NACK - device not found
-                i2c_stop <= 1;
-                state    <= S_ERROR;
+                r_i2c_stop <= 1;
+                r_state    <= S_ERROR;
               end else begin
-                i2c_wdata  <= REG_CONFIG;
-                i2c_wvalid <= 1;
-                step       <= 2;
+                r_i2c_wdata  <= REG_CONFIG;
+                r_i2c_wvalid <= 1;
+                r_step       <= 2;
               end
             end
-            2: if (i2c_done) begin
-              i2c_wdata  <= CONFIG_MSB;
-              i2c_wvalid <= 1;
-              step       <= 3;
+            2: if (w_i2c_done) begin
+              r_i2c_wdata  <= CONFIG_MSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 3;
             end
-            3: if (i2c_done) begin
-              i2c_wdata  <= CONFIG_LSB;
-              i2c_wvalid <= 1;
-              step       <= 4;
+            3: if (w_i2c_done) begin
+              r_i2c_wdata  <= CONFIG_LSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 4;
             end
-            4: if (i2c_done) begin
-              i2c_stop <= 1;
-              step     <= 5;
+            4: if (w_i2c_done) begin
+              r_i2c_stop <= 1;
+              r_step     <= 5;
             end
-            5: if (i2c_done) begin
-              step  <= 0;
-              state <= S_WRITE_LO;
+            5: if (w_i2c_done) begin
+              r_step  <= 0;
+              r_state <= S_WRITE_LO;
             end
+            default: r_step <= 0;
           endcase
         end
 
         S_WRITE_LO: begin
-          case (step)
+          case (r_step)
             0: begin
-              i2c_addr  <= ADDR;
-              i2c_rw    <= 0;
-              i2c_start <= 1;
-              step      <= 1;
+              r_i2c_addr  <= ADDR;
+              r_i2c_rw    <= 0;
+              r_i2c_start <= 1;
+              r_step      <= 1;
             end
-            1: if (i2c_done) begin
-              i2c_wdata  <= REG_LO;
-              i2c_wvalid <= 1;
-              step       <= 2;
+            1: if (w_i2c_done) begin
+              r_i2c_wdata  <= REG_LO;
+              r_i2c_wvalid <= 1;
+              r_step       <= 2;
             end
-            2: if (i2c_done) begin
-              i2c_wdata  <= LO_THRESH_MSB;
-              i2c_wvalid <= 1;
-              step       <= 3;
+            2: if (w_i2c_done) begin
+              r_i2c_wdata  <= LO_THRESH_MSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 3;
             end
-            3: if (i2c_done) begin
-              i2c_wdata  <= LO_THRESH_LSB;
-              i2c_wvalid <= 1;
-              step       <= 4;
+            3: if (w_i2c_done) begin
+              r_i2c_wdata  <= LO_THRESH_LSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 4;
             end
-            4: if (i2c_done) begin
-              i2c_stop <= 1;
-              step     <= 5;
+            4: if (w_i2c_done) begin
+              r_i2c_stop <= 1;
+              r_step     <= 5;
             end
-            5: if (i2c_done) begin
-              step  <= 0;
-              state <= S_WRITE_HI;
+            5: if (w_i2c_done) begin
+              r_step  <= 0;
+              r_state <= S_WRITE_HI;
             end
+            default: r_step <= 0;
           endcase
         end
 
         S_WRITE_HI: begin
-          case (step)
+          case (r_step)
             0: begin
-              i2c_addr  <= ADDR;
-              i2c_rw    <= 0;
-              i2c_start <= 1;
-              step      <= 1;
+              r_i2c_addr  <= ADDR;
+              r_i2c_rw    <= 0;
+              r_i2c_start <= 1;
+              r_step      <= 1;
             end
-            1: if (i2c_done) begin
-              i2c_wdata  <= REG_HI;
-              i2c_wvalid <= 1;
-              step       <= 2;
+            1: if (w_i2c_done) begin
+              r_i2c_wdata  <= REG_HI;
+              r_i2c_wvalid <= 1;
+              r_step       <= 2;
             end
-            2: if (i2c_done) begin
-              i2c_wdata  <= HI_THRESH_MSB;
-              i2c_wvalid <= 1;
-              step       <= 3;
+            2: if (w_i2c_done) begin
+              r_i2c_wdata  <= HI_THRESH_MSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 3;
             end
-            3: if (i2c_done) begin
-              i2c_wdata  <= HI_THRESH_LSB;
-              i2c_wvalid <= 1;
-              step       <= 4;
+            3: if (w_i2c_done) begin
+              r_i2c_wdata  <= HI_THRESH_LSB;
+              r_i2c_wvalid <= 1;
+              r_step       <= 4;
             end
-            4: if (i2c_done) begin
-              i2c_stop <= 1;
-              step     <= 5;
+            4: if (w_i2c_done) begin
+              r_i2c_stop <= 1;
+              r_step     <= 5;
             end
-            5: if (i2c_done) begin
-              step  <= 0;
-              state <= S_WAIT_ALERT;
+            5: if (w_i2c_done) begin
+              r_step  <= 0;
+              r_state <= S_WAIT_ALERT;
             end
+            default: r_step <= 0;
           endcase
         end
 
         S_WAIT_ALERT: begin
           // Wait for falling edge on ALERT (conversion ready)
-          if (alert_prev && !i_alert) begin
-            state <= S_READ_START;
+          if (r_alert_prev && !i_alert) begin
+            r_state <= S_READ_START;
           end
         end
 
         S_READ_START: begin
-          case (step)
+          case (r_step)
             0: begin
-              i2c_addr  <= ADDR;
-              i2c_rw    <= 0;  // Write to set pointer
-              i2c_start <= 1;
-              step      <= 1;
+              r_i2c_addr  <= ADDR;
+              r_i2c_rw    <= 0;  // Write to set pointer
+              r_i2c_start <= 1;
+              r_step      <= 1;
             end
-            1: if (i2c_done) begin
-              i2c_wdata  <= REG_CONV;
-              i2c_wvalid <= 1;
-              step       <= 2;
+            1: if (w_i2c_done) begin
+              r_i2c_wdata  <= REG_CONV;
+              r_i2c_wvalid <= 1;
+              r_step       <= 2;
             end
-            2: if (i2c_done) begin
-              step  <= 0;
-              state <= S_READ_RESTART;
+            2: if (w_i2c_done) begin
+              r_step  <= 0;
+              r_state <= S_READ_RESTART;
             end
+            default: r_step <= 0;
           endcase
         end
 
         S_READ_RESTART: begin
-          case (step)
+          case (r_step)
             0: begin
-              i2c_addr  <= ADDR;
-              i2c_rw    <= 1;  // Read
-              i2c_start <= 1;  // Repeated start
-              step      <= 1;
+              r_i2c_addr  <= ADDR;
+              r_i2c_rw    <= 1;  // Read
+              r_i2c_start <= 1;  // Repeated start
+              r_step      <= 1;
             end
             1: begin
               // Keep rready high until we get first byte
-              i2c_rready   <= 1;
-              i2c_ack_send <= 0;  // ACK after first byte
-              if (i2c_rvalid) begin
-                read_data[15:8] <= i2c_rdata;
-                step            <= 2;
+              r_i2c_rready   <= 1;
+              r_i2c_ack_send <= 0;  // ACK after first byte
+              if (w_i2c_rvalid) begin
+                r_read_data[15:8] <= w_i2c_rdata;
+                r_step            <= 2;
               end
             end
             2: begin
               // Keep rready high until we get second byte
-              i2c_rready   <= 1;
-              i2c_ack_send <= 1;  // NACK after second byte
-              if (i2c_rvalid) begin
-                read_data[7:0] <= i2c_rdata;
-                i2c_stop      <= 1;
-                step          <= 3;
+              r_i2c_rready   <= 1;
+              r_i2c_ack_send <= 1;  // NACK after second byte
+              if (w_i2c_rvalid) begin
+                r_read_data[7:0] <= w_i2c_rdata;
+                r_i2c_stop       <= 1;
+                r_step           <= 3;
               end
             end
-            3: if (i2c_done) begin
-              o_data  <= read_data;
+            3: if (w_i2c_done) begin
+              o_data  <= r_read_data;
               o_valid <= 1;
-              step    <= 0;
-              state   <= S_WAIT_ALERT;
+              r_step  <= 0;
+              r_state <= S_WAIT_ALERT;
             end
+            default: r_step <= 0;
           endcase
         end
 
         S_ERROR: begin
           // Wait for stop to complete, then signal error
-          if (i2c_done || !i2c_busy) begin
+          if (w_i2c_done || !w_i2c_busy) begin
             o_error <= 1;
             // Stay in error state (requires reset to retry)
           end
         end
 
-        default: state <= S_INIT;
+        default: r_state <= S_INIT;
       endcase
     end
   end

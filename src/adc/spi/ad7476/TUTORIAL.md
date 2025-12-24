@@ -39,13 +39,13 @@ The AD7476A protocol:
 ### Memory Write Logic
 
 ```verilog
-reg [11:0] adc_memory [0:NUM_POINTS-1];
-reg mem_wr_en;
-reg [11:0] captured_data;
+reg [11:0] r_adc_memory [0:NUM_POINTS-1];
+reg r_mem_wr_en;
+reg [11:0] r_captured_data;
 
-always @(posedge clk) begin
-  if (mem_wr_en)
-    adc_memory[point_index] <= captured_data;
+always @(posedge i_clk) begin
+  if (r_mem_wr_en)
+    r_adc_memory[r_point_index] <= r_captured_data;
 end
 ```
 
@@ -58,24 +58,24 @@ Unlike reading (which has a separate output register), writing is direct:
 
 ```verilog
 WAIT_ADC: begin
-  if (adc_done) begin
-    captured_data <= adc_data;  // Capture the data
-    state <= STORE;
+  if (w_adc_done) begin
+    r_captured_data <= w_adc_data;  // Capture the data
+    r_state <= STORE;
   end
 end
 
 STORE: begin
-  mem_wr_en <= 1'b1;  // Write captured data to memory
+  r_mem_wr_en <= 1'b1;  // Write captured data to memory
   ...
 end
 ```
 
 Why capture first, then write?
-1. `adc_data` is only valid briefly when `adc_done` pulses
-2. We capture it into `captured_data` to hold it stable
-3. Then we assert `mem_wr_en` to write it to memory
+1. `w_adc_data` is only valid briefly when `w_adc_done` pulses
+2. We capture it into `r_captured_data` to hold it stable
+3. Then we assert `r_mem_wr_en` to write it to memory
 
-This is a common pattern: **capture, then process**.
+This is a common pattern: **capture, then process**. Note the `w_` prefix for wires (module outputs) and `r_` for registers.
 
 ### Sweep State Machine
 
@@ -97,21 +97,21 @@ IDLE ──▶ READ_ADC ──▶ WAIT_ADC ──▶ STORE ──┐
 ### MISO Synchronization
 
 ```verilog
-reg [1:0] miso_sync;
-always @(posedge clk) begin
-  miso_sync <= {miso_sync[0], adc_miso};
+reg [1:0] r_miso_sync;
+always @(posedge i_clk) begin
+  r_miso_sync <= {r_miso_sync[0], i_adc_miso};
 end
-wire miso_in = miso_sync[1];
+wire w_miso_in = r_miso_sync[1];
 ```
 
-Just like UART RX, we synchronize the input to prevent metastability. The ADC's MISO signal is driven by the ADC's clock domain, not ours.
+Just like UART RX, we synchronize the input to prevent metastability. The ADC's MISO signal is driven by the ADC's clock domain, not ours. Note the naming: `r_` for the synchronizer registers, `w_` for the wire output.
 
 ### Sampling on Rising Edge
 
 ```verilog
-if (!adc_sclk) begin  // About to go high = rising edge
-  shift_reg <= {shift_reg[14:0], miso_in};
-  bit_cnt <= bit_cnt - 1;
+if (!o_adc_sclk) begin  // About to go high = rising edge
+  r_shift_reg <= {r_shift_reg[14:0], w_miso_in};
+  r_bit_cnt <= r_bit_cnt - 1;
 end
 ```
 
@@ -132,13 +132,13 @@ MISO:  ═══X═══════X═══════X════
 ### Receive Shift Register
 
 ```verilog
-shift_reg <= {shift_reg[14:0], miso_in};
+r_shift_reg <= {r_shift_reg[14:0], w_miso_in};
 ```
 
 For receiving, we shift left and insert new bits on the right:
 - Take bits 14:0 (drop the MSB)
-- Append `miso_in` on the right
-- After 16 shifts, `shift_reg[11:0]` contains the 12-bit value
+- Append `w_miso_in` on the right
+- After 16 shifts, `r_shift_reg[11:0]` contains the 12-bit value
 
 This is the opposite of transmit (which shifts right and outputs MSB).
 
@@ -146,14 +146,14 @@ This is the opposite of transmit (which shifts right and outputs MSB).
 
 ```verilog
 DONE: begin
-  data <= shift_reg[11:0];  // Extract 12-bit value
-  done <= 1'b1;
+  o_data <= r_shift_reg[11:0];  // Extract 12-bit value
+  o_done <= 1'b1;
 end
 ```
 
 The AD7476A sends 4 leading zeros, then 12 bits of data. After shifting in all 16 bits:
-- `shift_reg[15:12]` = leading zeros (discard)
-- `shift_reg[11:0]` = actual ADC reading (keep)
+- `r_shift_reg[15:12]` = leading zeros (discard)
+- `r_shift_reg[11:0]` = actual ADC reading (keep)
 
 ## DAC vs ADC Comparison
 

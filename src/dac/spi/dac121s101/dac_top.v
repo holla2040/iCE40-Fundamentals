@@ -21,60 +21,60 @@ module top (
 );
 
   // Reset generator
-  reg [7:0] reset_cnt = 8'd0;
-  wire rst_n = reset_cnt[7];
+  reg [7:0] r_reset_cnt = 8'd0;
+  wire w_rst_n = r_reset_cnt[7];
 
   always @(posedge i_Clk) begin
-    if (!reset_cnt[7])
-      reset_cnt <= reset_cnt + 1;
+    if (!r_reset_cnt[7])
+      r_reset_cnt <= r_reset_cnt + 1;
   end
 
   // Trigger edge detect
-  reg [2:0] trigger_sync;
+  reg [2:0] r_trigger_sync;
   always @(posedge i_Clk) begin
-    trigger_sync <= {trigger_sync[1:0], i_Switch_1};
+    r_trigger_sync <= {r_trigger_sync[1:0], i_Switch_1};
   end
-  wire trigger_rise = (trigger_sync[2:1] == 2'b01);
+  wire w_trigger_rise = (r_trigger_sync[2:1] == 2'b01);
 
   // Sweep control
-  wire busy, done;
-  wire sweep_start = trigger_rise && !busy;
-  wire dac_start;
-  wire [11:0] dac_data;
-  wire dac_done;
+  wire w_busy, w_done;
+  wire w_sweep_start = w_trigger_rise && !w_busy;
+  wire w_dac_start;
+  wire [11:0] w_dac_data;
+  wire w_dac_done;
 
   // Map to LED outputs
-  assign o_LED_1 = busy;
-  assign o_LED_2 = done;
+  assign o_LED_1 = w_busy;
+  assign o_LED_2 = w_done;
 
   // DAC Sweep Controller
   dac_sweep u_sweep (
-    .clk      (i_Clk),
-    .rst_n    (rst_n),
-    .start    (sweep_start),
-    .busy     (busy),
-    .done     (done),
-    .dac_start(dac_start),
-    .dac_data (dac_data),
-    .dac_done (dac_done)
+    .i_clk      (i_Clk),
+    .i_rst_n    (w_rst_n),
+    .i_start    (w_sweep_start),
+    .o_busy     (w_busy),
+    .o_done     (w_done),
+    .o_dac_start(w_dac_start),
+    .o_dac_data (w_dac_data),
+    .i_dac_done (w_dac_done)
   );
 
   // Internal SPI signals
-  wire dac_cs_n, dac_sclk, dac_mosi;
-  assign io_PMOD_1 = dac_cs_n;
-  assign io_PMOD_2 = dac_sclk;
-  assign io_PMOD_3 = dac_mosi;
+  wire w_dac_cs_n, w_dac_sclk, w_dac_mosi;
+  assign io_PMOD_1 = w_dac_cs_n;
+  assign io_PMOD_2 = w_dac_sclk;
+  assign io_PMOD_3 = w_dac_mosi;
 
   // DAC SPI Master
   dac_spi u_dac (
-    .clk      (i_Clk),
-    .rst_n    (rst_n),
-    .start    (dac_start),
-    .data     (dac_data),
-    .done     (dac_done),
-    .dac_cs_n (dac_cs_n),
-    .dac_sclk (dac_sclk),
-    .dac_mosi (dac_mosi)
+    .i_clk      (i_Clk),
+    .i_rst_n    (w_rst_n),
+    .i_start    (w_dac_start),
+    .i_data     (w_dac_data),
+    .o_done     (w_dac_done),
+    .o_dac_cs_n (w_dac_cs_n),
+    .o_dac_sclk (w_dac_sclk),
+    .o_dac_mosi (w_dac_mosi)
   );
 
 endmodule
@@ -86,16 +86,16 @@ endmodule
 module dac_sweep #(
   parameter NUM_POINTS = 200
 )(
-  input  wire        clk,
-  input  wire        rst_n,
-  
-  input  wire        start,
-  output reg         busy,
-  output reg         done,
-  
-  output reg         dac_start,
-  output reg  [11:0] dac_data,
-  input  wire        dac_done
+  input  wire        i_clk,
+  input  wire        i_rst_n,
+
+  input  wire        i_start,
+  output reg         o_busy,
+  output reg         o_done,
+
+  output reg         o_dac_start,
+  output reg  [11:0] o_dac_data,
+  input  wire        i_dac_done
 );
 
   // State machine
@@ -103,70 +103,72 @@ module dac_sweep #(
   localparam LOAD     = 2'd1;
   localparam SEND_DAC = 2'd2;
   localparam WAIT_DAC = 2'd3;
-  
-  reg [1:0] state;
-  reg [7:0] point_index;
+
+  reg [1:0] r_state;
+  reg [7:0] r_point_index;
 
   // Pre-filled DAC ramp memory
   // 0 to 4095 across 200 points
-  reg [11:0] dac_memory [0:NUM_POINTS-1];
-  reg [11:0] dac_mem_rd_data;
-  
+  reg [11:0] r_dac_memory [0:NUM_POINTS-1];
+  reg [11:0] r_dac_mem_rd_data;
+
   // Initialize memory from file
   initial begin
-    $readmemh("ramp.mem", dac_memory);
-  end
-  
-  // Memory read
-  always @(posedge clk) begin
-    dac_mem_rd_data <= dac_memory[point_index];
+    $readmemh("ramp.mem", r_dac_memory);
   end
 
-  // State machine
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      state       <= IDLE;
-      busy        <= 1'b0;
-      done        <= 1'b0;
-      dac_start   <= 1'b0;
-      dac_data    <= 12'd0;
-      point_index <= 8'd0;
+  // Memory read
+  always @(posedge i_clk) begin
+    r_dac_mem_rd_data <= r_dac_memory[r_point_index];
+  end
+
+  // State machine (synchronous reset)
+  always @(posedge i_clk) begin
+    if (!i_rst_n) begin
+      r_state       <= IDLE;
+      o_busy        <= 1'b0;
+      o_done        <= 1'b0;
+      o_dac_start   <= 1'b0;
+      o_dac_data    <= 12'd0;
+      r_point_index <= 8'd0;
     end else begin
-      dac_start <= 1'b0;
-      done      <= 1'b0;
-      
-      case (state)
+      o_dac_start <= 1'b0;
+      o_done      <= 1'b0;
+
+      case (r_state)
         IDLE: begin
-          busy <= 1'b0;
-          if (start) begin
-            busy        <= 1'b1;
-            point_index <= 8'd0;
-            state       <= LOAD;
+          o_busy <= 1'b0;
+          if (i_start) begin
+            o_busy        <= 1'b1;
+            r_point_index <= 8'd0;
+            r_state       <= LOAD;
           end
         end
-        
+
         LOAD: begin
           // Wait one cycle for memory read
-          state <= SEND_DAC;
+          r_state <= SEND_DAC;
         end
-        
+
         SEND_DAC: begin
-          dac_data  <= dac_mem_rd_data;
-          dac_start <= 1'b1;
-          state     <= WAIT_DAC;
+          o_dac_data  <= r_dac_mem_rd_data;
+          o_dac_start <= 1'b1;
+          r_state     <= WAIT_DAC;
         end
-        
+
         WAIT_DAC: begin
-          if (dac_done) begin
-            if (point_index == (NUM_POINTS - 1)) begin
-              done  <= 1'b1;
-              state <= IDLE;
+          if (i_dac_done) begin
+            if (r_point_index == (NUM_POINTS - 1)) begin
+              o_done  <= 1'b1;
+              r_state <= IDLE;
             end else begin
-              point_index <= point_index + 1;
-              state       <= LOAD;
+              r_point_index <= r_point_index + 1;
+              r_state       <= LOAD;
             end
           end
         end
+
+        default: r_state <= IDLE;
       endcase
     end
   end
@@ -186,79 +188,82 @@ endmodule
 module dac_spi #(
   parameter CLK_DIV = 2  // 12 MHz / 2 = 6 MHz SCLK
 )(
-  input  wire        clk,
-  input  wire        rst_n,
-  
-  input  wire        start,
-  input  wire [11:0] data,
-  output reg         done,
-  
-  output reg         dac_cs_n,
-  output reg         dac_sclk,
-  output reg         dac_mosi
+  input  wire        i_clk,
+  input  wire        i_rst_n,
+
+  input  wire        i_start,
+  input  wire [11:0] i_data,
+  output reg         o_done,
+
+  output reg         o_dac_cs_n,
+  output reg         o_dac_sclk,
+  output reg         o_dac_mosi
 );
 
   localparam IDLE  = 2'd0;
   localparam SHIFT = 2'd1;
   localparam DONE  = 2'd2;
-  
-  reg [1:0]  state;
-  reg [4:0]  bit_cnt;
-  reg [15:0] shift_reg;
-  reg [3:0]  clk_cnt;
 
-  always @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      state     <= IDLE;
-      dac_cs_n  <= 1'b1;
-      dac_sclk  <= 1'b0;
-      dac_mosi  <= 1'b0;
-      done      <= 1'b0;
-      bit_cnt   <= 5'd0;
-      shift_reg <= 16'd0;
-      clk_cnt   <= 4'd0;
+  reg [1:0]  r_state;
+  reg [4:0]  r_bit_cnt;
+  reg [15:0] r_shift_reg;
+  reg [3:0]  r_clk_cnt;
+
+  // State machine (synchronous reset)
+  always @(posedge i_clk) begin
+    if (!i_rst_n) begin
+      r_state     <= IDLE;
+      o_dac_cs_n  <= 1'b1;
+      o_dac_sclk  <= 1'b0;
+      o_dac_mosi  <= 1'b0;
+      o_done      <= 1'b0;
+      r_bit_cnt   <= 5'd0;
+      r_shift_reg <= 16'd0;
+      r_clk_cnt   <= 4'd0;
     end else begin
-      done <= 1'b0;
-      
-      case (state)
+      o_done <= 1'b0;
+
+      case (r_state)
         IDLE: begin
-          dac_cs_n <= 1'b1;
-          dac_sclk <= 1'b0;
-          if (start) begin
+          o_dac_cs_n <= 1'b1;
+          o_dac_sclk <= 1'b0;
+          if (i_start) begin
             // DAC121S101 frame: [PD1][PD0][D11:D0][X][X]
-            shift_reg <= {2'b00, data, 2'b00};
-            bit_cnt   <= 5'd16;
-            dac_cs_n  <= 1'b0;
-            dac_mosi  <= 1'b0;
-            state     <= SHIFT;
+            r_shift_reg <= {2'b00, i_data, 2'b00};
+            r_bit_cnt   <= 5'd16;
+            o_dac_cs_n  <= 1'b0;
+            o_dac_mosi  <= 1'b0;
+            r_state     <= SHIFT;
           end
         end
-        
+
         SHIFT: begin
-          clk_cnt <= clk_cnt + 1;
-          if (clk_cnt == CLK_DIV - 1) begin
-            clk_cnt  <= 4'd0;
-            dac_sclk <= ~dac_sclk;
-            
+          r_clk_cnt <= r_clk_cnt + 1;
+          if (r_clk_cnt == CLK_DIV - 1) begin
+            r_clk_cnt  <= 4'd0;
+            o_dac_sclk <= ~o_dac_sclk;
+
             // Shift on falling edge
-            if (dac_sclk) begin
-              dac_mosi  <= shift_reg[15];
-              shift_reg <= {shift_reg[14:0], 1'b0};
-              bit_cnt   <= bit_cnt - 1;
-              
-              if (bit_cnt == 1) begin
-                state <= DONE;
+            if (o_dac_sclk) begin
+              o_dac_mosi  <= r_shift_reg[15];
+              r_shift_reg <= {r_shift_reg[14:0], 1'b0};
+              r_bit_cnt   <= r_bit_cnt - 1;
+
+              if (r_bit_cnt == 1) begin
+                r_state <= DONE;
               end
             end
           end
         end
-        
+
         DONE: begin
-          dac_cs_n <= 1'b1;
-          dac_sclk <= 1'b0;
-          done     <= 1'b1;
-          state    <= IDLE;
+          o_dac_cs_n <= 1'b1;
+          o_dac_sclk <= 1'b0;
+          o_done     <= 1'b1;
+          r_state    <= IDLE;
         end
+
+        default: r_state <= IDLE;
       endcase
     end
   end

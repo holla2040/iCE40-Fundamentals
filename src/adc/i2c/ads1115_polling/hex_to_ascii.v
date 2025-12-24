@@ -24,6 +24,7 @@ module hex_to_ascii (
       4'hD: o_ascii = "D";
       4'hE: o_ascii = "E";
       4'hF: o_ascii = "F";
+      default: o_ascii = "?";
     endcase
   end
 

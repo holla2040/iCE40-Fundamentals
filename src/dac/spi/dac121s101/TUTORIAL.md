@@ -41,11 +41,11 @@ The DAC121S101 expects:
 ### Edge Detection
 
 ```verilog
-reg [2:0] trigger_sync;
-always @(posedge clk) begin
-  trigger_sync <= {trigger_sync[1:0], trigger_in};
+reg [2:0] r_trigger_sync;
+always @(posedge i_clk) begin
+  r_trigger_sync <= {r_trigger_sync[1:0], i_trigger};
 end
-wire trigger_rise = (trigger_sync[2:1] == 2'b01);
+wire w_trigger_rise = (r_trigger_sync[2:1] == 2'b01);
 ```
 
 This detects a rising edge on the trigger input:
@@ -54,49 +54,50 @@ This detects a rising edge on the trigger input:
 3. `2'b01` means "was 0, now 1" = rising edge
 
 The 3-bit shift register gives us:
-- `trigger_sync[0]`: Current (possibly metastable)
-- `trigger_sync[1]`: Previous (stable)
-- `trigger_sync[2]`: Two cycles ago (stable)
+- `r_trigger_sync[0]`: Current (possibly metastable)
+- `r_trigger_sync[1]`: Previous (stable)
+- `r_trigger_sync[2]`: Two cycles ago (stable)
 
-### Active-Low Reset
+Note the naming: `r_` for the register, `w_` for the wire, `i_` for the input port.
+
+### Synchronous Reset
 
 ```verilog
-wire rst_n = reset_cnt[7];
+wire w_rst = !r_reset_cnt[7];
 
-always @(posedge clk or negedge rst_n) begin
-  if (!rst_n) begin
+always @(posedge i_clk) begin
+  if (w_rst) begin
     // Reset logic
   end
 ```
 
-`rst_n` means "reset, active low" - reset is active when the signal is 0.
+This project uses **synchronous reset** (preferred for iCE40 which has no dedicated reset routing):
 
-- `negedge rst_n` triggers on the falling edge of rst_n
-- `!rst_n` is true when rst_n is low (reset active)
-
-This is **asynchronous reset** - it happens immediately, not waiting for a clock edge.
+- `w_rst` is high during the first 128 clock cycles after power-on
+- Reset logic runs on the regular clock edge when `w_rst` is true
+- This integrates better with FPGA timing analysis
 
 ## Code Walkthrough: dac_sweep Module
 
 ### Memory Array with File Initialization
 
 ```verilog
-reg [11:0] dac_memory [0:NUM_POINTS-1];
+reg [11:0] r_dac_memory [0:NUM_POINTS-1];
 
 initial begin
-  $readmemh("ramp.mem", dac_memory);
+  $readmemh("ramp.mem", r_dac_memory);
 end
 ```
 
-- `reg [11:0] dac_memory [0:199]` declares 200 twelve-bit values
+- `reg [11:0] r_dac_memory [0:199]` declares 200 twelve-bit values
 - `$readmemh` reads hexadecimal values from a file at synthesis time
 - The file `ramp.mem` contains one hex value per line: `000`, `014`, `029`, etc.
 
 ### Synchronous Memory Read
 
 ```verilog
-always @(posedge clk) begin
-  dac_mem_rd_data <= dac_memory[point_index];
+always @(posedge i_clk) begin
+  r_dac_mem_rd_data <= r_dac_memory[r_point_index];
 end
 ```
 
@@ -122,12 +123,12 @@ IDLE ──▶ LOAD ──▶ SEND_DAC ──▶ WAIT_DAC ──┐
 ### Frame Construction
 
 ```verilog
-shift_reg <= {2'b00, data, 2'b00};
+r_shift_reg <= {2'b00, i_data, 2'b00};
 ```
 
 Builds the 16-bit SPI frame:
 - `2'b00`: Power-down bits (normal operation)
-- `data`: 12-bit DAC value
+- `i_data`: 12-bit DAC value
 - `2'b00`: Don't care bits
 
 ### Clock Division
@@ -135,10 +136,10 @@ Builds the 16-bit SPI frame:
 ```verilog
 parameter CLK_DIV = 2
 
-clk_cnt <= clk_cnt + 1;
-if (clk_cnt == CLK_DIV - 1) begin
-  clk_cnt  <= 4'd0;
-  dac_sclk <= ~dac_sclk;
+r_clk_cnt <= r_clk_cnt + 1;
+if (r_clk_cnt == CLK_DIV - 1) begin
+  r_clk_cnt   <= 4'd0;
+  o_dac_sclk <= ~o_dac_sclk;
 ```
 
 The system clock is too fast for SPI. We divide it:
@@ -149,10 +150,10 @@ The system clock is too fast for SPI. We divide it:
 ### MSB-First Transmission
 
 ```verilog
-if (dac_sclk) begin  // Falling edge
-  dac_mosi  <= shift_reg[15];           // Output MSB
-  shift_reg <= {shift_reg[14:0], 1'b0}; // Shift left
-  bit_cnt   <= bit_cnt - 1;
+if (o_dac_sclk) begin  // Falling edge
+  o_dac_mosi  <= r_shift_reg[15];             // Output MSB
+  r_shift_reg <= {r_shift_reg[14:0], 1'b0};   // Shift left
+  r_bit_cnt   <= r_bit_cnt - 1;
 end
 ```
 
@@ -165,15 +166,15 @@ Unlike UART (LSB first), SPI typically sends MSB first:
 
 ```verilog
 IDLE: begin
-  dac_cs_n <= 1'b1;  // CS high when idle
-  if (start) begin
-    dac_cs_n <= 1'b0;  // CS low to start
-    state <= SHIFT;
+  o_dac_cs_n <= 1'b1;  // CS high when idle
+  if (i_start) begin
+    o_dac_cs_n <= 1'b0;  // CS low to start
+    r_state <= SHIFT;
   end
 end
 
 DONE: begin
-  dac_cs_n <= 1'b1;  // CS high when done
+  o_dac_cs_n <= 1'b1;  // CS high when done
 end
 ```
 

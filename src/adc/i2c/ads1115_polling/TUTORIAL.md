@@ -73,15 +73,15 @@ SB_IO #(
   .PULLUP(1'b1)           // Enable internal pull-up
 ) sda_io (
   .PACKAGE_PIN(io_PMOD_3),
-  .OUTPUT_ENABLE(!sda_out),  // Drive low when sda_out=0
-  .D_OUT_0(1'b0),            // Always output 0 when driving
-  .D_IN_0(sda_in)            // Read actual pin state
+  .OUTPUT_ENABLE(!w_sda_out),  // Drive low when w_sda_out=0
+  .D_OUT_0(1'b0),              // Always output 0 when driving
+  .D_IN_0(w_sda_in)            // Read actual pin state
 );
 ```
 
 Key insight: We always output 0, but control whether we're driving:
-- `sda_out = 1` → `OUTPUT_ENABLE = 0` → line floats high (via pull-up)
-- `sda_out = 0` → `OUTPUT_ENABLE = 1` → line driven low
+- `w_sda_out = 1` → `OUTPUT_ENABLE = 0` → line floats high (via pull-up)
+- `w_sda_out = 0` → `OUTPUT_ENABLE = 1` → line driven low
 
 ## I2C Master Implementation
 
@@ -170,23 +170,24 @@ To write to a register:
 
 ```verilog
 S_WRITE_CONFIG: begin
-  case (step)
+  case (r_step)
     0: begin
-      i2c_addr  <= ADDR;     // 0x48
-      i2c_rw    <= 0;        // Write mode
-      i2c_start <= 1;
-      step      <= 1;
+      r_i2c_addr  <= ADDR;     // 0x48
+      r_i2c_rw    <= 0;        // Write mode
+      r_i2c_start <= 1;
+      r_step      <= 1;
     end
-    1: if (i2c_done) begin
-      if (i2c_ack_recv)      // NACK = device not found
-        state <= S_ERROR;
+    1: if (w_i2c_done) begin
+      if (w_i2c_ack_recv)      // NACK = device not found
+        r_state <= S_ERROR;
       else begin
-        i2c_wdata  <= REG_CONFIG;  // 0x01
-        i2c_wvalid <= 1;
-        step       <= 2;
+        r_i2c_wdata  <= REG_CONFIG;  // 0x01
+        r_i2c_wvalid <= 1;
+        r_step       <= 2;
       end
     end
     // ... continue with CONFIG_MSB, CONFIG_LSB
+    default: r_step <= 0;
   endcase
 end
 ```
@@ -216,11 +217,11 @@ This version polls the conversion register at a fixed interval:
 ```verilog
 S_WAIT_POLL: begin
   // Poll every ~2.6ms (65536 clocks at 25MHz)
-  if (poll_cnt == 0) begin
-    poll_cnt <= 16'hFFFF;
-    state    <= S_READ_START;
+  if (r_poll_cnt == 0) begin
+    r_poll_cnt <= 16'hFFFF;
+    r_state    <= S_READ_START;
   end else begin
-    poll_cnt <= poll_cnt - 1;
+    r_poll_cnt <= r_poll_cnt - 1;
   end
 end
 ```
@@ -250,9 +251,9 @@ endmodule
 The driver detects a missing device by checking the ACK after the address byte:
 
 ```verilog
-if (i2c_ack_recv) begin  // NACK received
-  i2c_stop <= 1;
-  state    <= S_ERROR;
+if (w_i2c_ack_recv) begin  // NACK received
+  r_i2c_stop <= 1;
+  r_state    <= S_ERROR;
 end
 ```
 

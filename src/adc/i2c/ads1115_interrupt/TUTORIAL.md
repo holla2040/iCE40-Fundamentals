@@ -104,17 +104,17 @@ START → ADDR+W → ACK → REG_PTR → ACK → MSB → ACK → LSB → ACK →
 The driver watches for a falling edge on the ALERT pin:
 
 ```verilog
-reg alert_prev;
+reg r_alert_prev;
 
-always @(posedge clk) begin
-  alert_prev <= i_alert;
+always @(posedge i_clk) begin
+  r_alert_prev <= i_alert;
 
   // ...
 
   S_WAIT_ALERT: begin
-    // Falling edge: alert_prev=1 and i_alert=0
-    if (alert_prev && !i_alert) begin
-      state <= S_READ_START;
+    // Falling edge: r_alert_prev=1 and i_alert=0
+    if (r_alert_prev && !i_alert) begin
+      r_state <= S_READ_START;
     end
   end
 end
@@ -122,13 +122,15 @@ end
 
 This is a standard edge detection pattern:
 ```
-i_alert:     ────┐     ┌────
-                 └─────┘
-alert_prev:  ─────┐    ┌────  (delayed 1 clock)
-                  └────┘
-Falling edge:  ───┐────────   (1 clock pulse)
+i_alert:       ────┐     ┌────
+                   └─────┘
+r_alert_prev:  ─────┐    ┌────  (delayed 1 clock)
+                    └────┘
+Falling edge:  ───┐────────     (1 clock pulse)
                   └
 ```
+
+Note the naming: `r_alert_prev` is a register (stores previous value), `i_alert` is an input port.
 
 ## Timing Analysis
 

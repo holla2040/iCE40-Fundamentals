@@ -40,8 +40,12 @@ module uart_tx #(
   parameter CLK_FREQ = 12_000_000,
   parameter BAUD     = 115200
 )(
-  input  wire       clk,
-  ...
+  input  wire       i_clk,
+  input  wire       i_rst,
+  input  wire [7:0] i_tx_data,
+  input  wire       i_tx_start,
+  output reg        o_tx_out,
+  output reg        o_tx_busy
 );
 ```
 
@@ -49,6 +53,7 @@ Parameters make modules reusable. The `#(...)` syntax defines parameters that ca
 
 - `CLK_FREQ`: System clock frequency in Hz
 - `BAUD`: Bits per second for serial communication
+- Note the `i_`/`o_` prefixes on ports per project style guide
 
 ### Calculated Constants
 
@@ -64,26 +69,26 @@ This tells us how long to hold each bit.
 ### State Machine States
 
 ```verilog
-localparam IDLE      = 3'd0;
-localparam START_BIT = 3'd1;
-localparam DATA_BITS = 3'd2;
-localparam STOP_BIT  = 3'd3;
+localparam IDLE      = 2'd0;
+localparam START_BIT = 2'd1;
+localparam DATA_BITS = 2'd2;
+localparam STOP_BIT  = 2'd3;
 
-reg [2:0] state;
+reg [1:0] r_state;
 ```
 
-A **state machine** (FSM) tracks where we are in a sequence. States are encoded as numbers. The `3'd0` syntax means "3-bit decimal 0".
+A **state machine** (FSM) tracks where we are in a sequence. States are encoded as numbers. The `2'd0` syntax means "2-bit decimal 0". Note the `r_` prefix indicating this is a register.
 
 ### The State Machine
 
 ```verilog
-always @(posedge clk) begin
-  if (rst) begin
+always @(posedge i_clk) begin
+  if (i_rst) begin
     // Reset all registers
   end else begin
-    case (state)
+    case (r_state)
       IDLE: begin
-        // Wait for tx_start
+        // Wait for i_tx_start
       end
       START_BIT: begin
         // Send start bit (low)
@@ -94,6 +99,7 @@ always @(posedge clk) begin
       STOP_BIT: begin
         // Send stop bit (high)
       end
+      default: r_state <= IDLE;
     endcase
   end
 end
@@ -103,25 +109,27 @@ The `case` statement selects behavior based on current state. Each state:
 1. Does its job (drive output, count clocks)
 2. Decides when to move to the next state
 
+Note: Always include a `default` clause in case statements.
+
 ### Shift Register for Data
 
 ```verilog
-tx_out <= tx_shift[0];  // Output LSB
-tx_shift <= tx_shift >> 1;  // Shift right
+o_tx_out <= r_tx_shift[0];  // Output LSB
+r_tx_shift <= r_tx_shift >> 1;  // Shift right
 ```
 
 A shift register moves bits through a register:
-- `tx_shift[0]` gets the least significant bit
+- `r_tx_shift[0]` gets the least significant bit
 - `>> 1` shifts all bits right, bringing in 0 from the left
 - After 8 shifts, all original bits have been sent
 
 ### Bit Timing
 
 ```verilog
-if (clk_count < CLKS_PER_BIT - 1) begin
-  clk_count <= clk_count + 1;
+if (r_clk_count < CLKS_PER_BIT - 1) begin
+  r_clk_count <= r_clk_count + 1;
 end else begin
-  clk_count <= 0;
+  r_clk_count <= 0;
   // Move to next bit
 end
 ```
@@ -152,12 +160,12 @@ uart_tx #(
   .CLK_FREQ(25_000_000),
   .BAUD(115200)
 ) uart_inst (
-  .clk(i_Clk),
-  .rst(rst),
-  .tx_data(tx_data),
-  .tx_start(tx_start),
-  .tx_out(o_UART_TX),
-  .tx_busy(tx_busy)
+  .i_clk(i_Clk),
+  .i_rst(w_rst),
+  .i_tx_data(r_tx_data),
+  .i_tx_start(r_tx_start),
+  .o_tx_out(o_UART_TX),
+  .o_tx_busy(w_tx_busy)
 );
 ```
 
@@ -165,47 +173,48 @@ This creates an instance of `uart_tx` named `uart_inst`:
 - `#(...)` overrides default parameters
 - `.port(signal)` connects module ports to local signals
 - The UART module handles the protocol; top module handles the message
+- Note port naming: `i_` for inputs, `o_` for outputs
 
 ### Reset Generation
 
 ```verilog
-reg [3:0] rst_count = 4'hF;
-wire rst = rst_count != 0;
+reg [3:0] r_rst_count = 4'hF;
+wire w_rst = r_rst_count != 0;
 always @(posedge i_Clk) begin
-  if (rst_count != 0)
-    rst_count <= rst_count - 1;
+  if (r_rst_count != 0)
+    r_rst_count <= r_rst_count - 1;
 end
 ```
 
 FPGAs don't have a reset button by default. This creates a "power-on reset":
 - Counter starts at 15 (4'hF)
 - Counts down to 0 over 15 clock cycles
-- `rst` is high while counting, then goes low forever
+- `w_rst` is high while counting, then goes low forever
 
 ### Handshake Protocol
 
 ```verilog
 SEND_CHAR: begin
-  if (!tx_busy) begin    // Wait until UART is ready
-    tx_start <= 1;       // Pulse start signal
-    state <= WAIT_DONE;
+  if (!w_tx_busy) begin    // Wait until UART is ready
+    r_tx_start <= 1;       // Pulse start signal
+    r_state <= WAIT_DONE;
   end
 end
 
 WAIT_DONE: begin
-  if (tx_busy) begin
+  if (w_tx_busy) begin
     // Transmission in progress
-  end else if (!tx_start) begin
+  end else if (!r_tx_start) begin
     // Done, move to next character
   end
 end
 ```
 
 The top module and UART module communicate via handshake signals:
-1. Top checks `tx_busy` is low (UART ready)
-2. Top pulses `tx_start` high
-3. UART sets `tx_busy` high and begins transmitting
-4. Top waits for `tx_busy` to go low (transmission complete)
+1. Top checks `w_tx_busy` is low (UART ready)
+2. Top pulses `r_tx_start` high
+3. UART sets `o_tx_busy` high and begins transmitting
+4. Top waits for `w_tx_busy` to go low (transmission complete)
 5. Repeat for next byte
 
 ## Key Takeaways

@@ -11,14 +11,14 @@ module test_freq_gen (
   // 25 MHz / 4 = 6.25 MHz, toggle every 2 cycles
   localparam HALF_PERIOD = 2 - 1;
 
-  reg [0:0] counter = 0;
+  reg [0:0] r_counter = 0;
 
   always @(posedge i_Clk) begin
-    if (counter >= HALF_PERIOD) begin
-      counter    <= 0;
+    if (r_counter >= HALF_PERIOD) begin
+      r_counter  <= 0;
       o_Freq_Out <= ~o_Freq_Out;
     end else begin
-      counter <= counter + 1;
+      r_counter <= r_counter + 1;
     end
   end
 

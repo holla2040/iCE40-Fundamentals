@@ -24,28 +24,30 @@ When transmitting, we control the timing. When receiving, we must:
 ### Input Synchronization
 
 ```verilog
-reg [1:0] rx_sync;
-always @(posedge clk) begin
-  rx_sync <= {rx_sync[0], rx_in};
+reg [1:0] r_rx_sync;
+always @(posedge i_clk) begin
+  r_rx_sync <= {r_rx_sync[0], i_rx_in};
 end
-wire rx_bit = rx_sync[1];
+wire w_rx_bit = r_rx_sync[1];
 ```
 
-This is critical for reliability. The external `rx_in` signal can change at any time, not synchronized to our clock. This causes **metastability** - the flip-flop might enter an undefined state.
+This is critical for reliability. The external `i_rx_in` signal can change at any time, not synchronized to our clock. This causes **metastability** - the flip-flop might enter an undefined state.
 
 The solution is a **synchronizer chain**:
-1. `rx_in` feeds into `rx_sync[0]` (might be metastable)
-2. `rx_sync[0]` feeds into `rx_sync[1]` (stable)
-3. We only use `rx_sync[1]` (called `rx_bit`)
+1. `i_rx_in` feeds into `r_rx_sync[0]` (might be metastable)
+2. `r_rx_sync[0]` feeds into `r_rx_sync[1]` (stable)
+3. We only use `r_rx_sync[1]` (called `w_rx_bit`)
 
-The `{rx_sync[0], rx_in}` syntax concatenates bits: the new value shifts in from the right.
+The `{r_rx_sync[0], i_rx_in}` syntax concatenates bits: the new value shifts in from the right.
+
+Note the naming conventions: `r_` for registers, `w_` for wires, `i_` for inputs.
 
 ### Detecting the Start Bit
 
 ```verilog
 IDLE: begin
-  if (rx_bit == 0) begin
-    state <= START_BIT;
+  if (w_rx_bit == 0) begin
+    r_state <= START_BIT;
   end
 end
 ```
@@ -56,14 +58,14 @@ UART idles high. When we see a low (0), it might be a start bit. But we need to 
 
 ```verilog
 START_BIT: begin
-  if (clk_count < (CLKS_PER_BIT - 1) / 2) begin
-    clk_count <= clk_count + 1;
+  if (r_clk_count < (CLKS_PER_BIT - 1) / 2) begin
+    r_clk_count <= r_clk_count + 1;
   end else begin
-    clk_count <= 0;
-    if (rx_bit == 0) begin  // Still low = valid start bit
-      state <= DATA_BITS;
+    r_clk_count <= 0;
+    if (w_rx_bit == 0) begin  // Still low = valid start bit
+      r_state <= DATA_BITS;
     end else begin
-      state <= IDLE;        // Was just noise
+      r_state <= IDLE;        // Was just noise
     end
   end
 end
@@ -91,16 +93,16 @@ We wait half a bit time (`CLKS_PER_BIT / 2`), then verify the line is still low.
 
 ```verilog
 DATA_BITS: begin
-  if (clk_count < CLKS_PER_BIT - 1) begin
-    clk_count <= clk_count + 1;
+  if (r_clk_count < CLKS_PER_BIT - 1) begin
+    r_clk_count <= r_clk_count + 1;
   end else begin
-    clk_count <= 0;
-    rx_shift <= {rx_bit, rx_shift[7:1]};  // Shift in from left
+    r_clk_count <= 0;
+    r_rx_shift <= {w_rx_bit, r_rx_shift[7:1]};  // Shift in from left
 
-    if (bit_index < 7) begin
-      bit_index <= bit_index + 1;
+    if (r_bit_index < 7) begin
+      r_bit_index <= r_bit_index + 1;
     end else begin
-      state <= STOP_BIT;
+      r_state <= STOP_BIT;
     end
   end
 end
@@ -122,9 +124,9 @@ input → [7][6][5][4][3][2][1][0]
           shift right
 ```
 
-The syntax `{rx_bit, rx_shift[7:1]}` means:
-- Take `rx_bit` (1 bit)
-- Concatenate with bits 7 down to 1 of `rx_shift` (7 bits)
+The syntax `{w_rx_bit, r_rx_shift[7:1]}` means:
+- Take `w_rx_bit` (1 bit)
+- Concatenate with bits 7 down to 1 of `r_rx_shift` (7 bits)
 - Result: new bit in position 7, old bits shifted right
 
 After 8 bits, the byte is assembled correctly (LSB in position 0).
@@ -133,14 +135,14 @@ After 8 bits, the byte is assembled correctly (LSB in position 0).
 
 ```verilog
 STOP_BIT: begin
-  if (clk_count < CLKS_PER_BIT - 1) begin
-    clk_count <= clk_count + 1;
+  if (r_clk_count < CLKS_PER_BIT - 1) begin
+    r_clk_count <= r_clk_count + 1;
   end else begin
-    if (rx_bit == 1) begin      // Stop bit should be high
-      rx_data  <= rx_shift;     // Output the received byte
-      rx_valid <= 1;            // Signal valid data
+    if (w_rx_bit == 1) begin      // Stop bit should be high
+      o_rx_data  <= r_rx_shift;   // Output the received byte
+      o_rx_valid <= 1;            // Signal valid data
     end
-    state <= IDLE;
+    r_state <= IDLE;
   end
 end
 ```
@@ -153,18 +155,18 @@ We only output data if the stop bit is correct (high). This catches framing erro
 
 ```verilog
 always @(posedge i_Clk) begin
-  if (rst) begin
+  if (w_rst) begin
     o_LED_1 <= 0;
-  end else if (rx_valid) begin
-    if (rx_data == "0")
+  end else if (w_rx_valid) begin
+    if (w_rx_data == "0")
       o_LED_1 <= 0;
-    else if (rx_data == "1")
+    else if (w_rx_data == "1")
       o_LED_1 <= 1;
   end
 end
 ```
 
-- `rx_valid` pulses high for one clock cycle when a byte is received
+- `w_rx_valid` pulses high for one clock cycle when a byte is received
 - We check the byte value and update the LED accordingly
 - `"0"` and `"1"` are ASCII characters (48 and 49 in decimal)
 - Other characters are ignored (LED keeps its current state)

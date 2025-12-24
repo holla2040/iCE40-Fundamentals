@@ -38,23 +38,23 @@ uart_rx #(
   .CLK_FREQ(25_000_000),
   .BAUD(115200)
 ) rx_inst (
-  .clk(i_Clk),
-  .rst(rst),
-  .rx_in(i_UART_RX),
-  .rx_data(rx_data),
-  .rx_valid(rx_valid)
+  .i_clk(i_Clk),
+  .i_rst(w_rst),
+  .i_rx_in(i_UART_RX),
+  .o_rx_data(w_rx_data),
+  .o_rx_valid(w_rx_valid)
 );
 
 uart_tx #(
   .CLK_FREQ(25_000_000),
   .BAUD(115200)
 ) tx_inst (
-  .clk(i_Clk),
-  .rst(rst),
-  .tx_data(tx_data),
-  .tx_start(tx_start),
-  .tx_out(o_UART_TX),
-  .tx_busy(tx_busy)
+  .i_clk(i_Clk),
+  .i_rst(w_rst),
+  .i_tx_data(r_tx_data),
+  .i_tx_start(r_tx_start),
+  .o_tx_out(o_UART_TX),
+  .o_tx_busy(w_tx_busy)
 );
 ```
 
@@ -67,21 +67,21 @@ Both modules are instantiated with:
 ### Case Swap Conversion
 
 ```verilog
-wire is_lower = (rx_data >= "a") && (rx_data <= "z");
-wire is_upper = (rx_data >= "A") && (rx_data <= "Z");
-wire [7:0] rx_swapped = is_lower ? (rx_data - 8'h20) :
-                        is_upper ? (rx_data + 8'h20) : rx_data;
+wire w_is_lower = (w_rx_data >= "a") && (w_rx_data <= "z");
+wire w_is_upper = (w_rx_data >= "A") && (w_rx_data <= "Z");
+wire [7:0] w_rx_swapped = w_is_lower ? (w_rx_data - 8'h20) :
+                          w_is_upper ? (w_rx_data + 8'h20) : w_rx_data;
 ```
 
-This is **combinational logic** - no clock, just wires:
+This is **combinational logic** - no clock, just wires (hence the `w_` prefix):
 
-- `is_lower` is true if the character is 'a' through 'z'
-- `is_upper` is true if the character is 'A' through 'Z'
+- `w_is_lower` is true if the character is 'a' through 'z'
+- `w_is_upper` is true if the character is 'A' through 'Z'
 - In ASCII, lowercase letters are 0x61-0x7A, uppercase are 0x41-0x5A
 - The difference is 0x20 (32 decimal)
 - Nested ternary operators select: lowercase→subtract, uppercase→add, else→passthrough
 
-The conversion happens instantly - `rx_swapped` always reflects the case-swapped version of `rx_data`.
+The conversion happens instantly - `w_rx_swapped` always reflects the case-swapped version of `w_rx_data`.
 
 ### Data Flow
 
@@ -114,31 +114,31 @@ localparam IDLE    = 2'd0;
 localparam WAIT_TX = 2'd1;
 localparam SENDING = 2'd2;
 
-reg [1:0] state = IDLE;
-reg [7:0] echo_data;
+reg [1:0] r_state = IDLE;
+reg [7:0] r_echo_data;
 ```
 
-Three states handle the timing:
+Three states handle the timing (note the `r_` prefix for registers):
 
 **IDLE** - Waiting for data
 ```verilog
 IDLE: begin
-  if (rx_valid) begin
-    echo_data <= rx_upper;  // Capture uppercase version
-    state     <= WAIT_TX;
+  if (w_rx_valid) begin
+    r_echo_data <= w_rx_swapped;  // Capture swapped version
+    r_state     <= WAIT_TX;
   end
 end
 ```
 
-When `rx_valid` pulses, we capture `rx_upper` (the uppercase version) into `echo_data`. This is critical - `rx_data` is only valid for one cycle.
+When `w_rx_valid` pulses, we capture `w_rx_swapped` (the case-swapped version) into `r_echo_data`. This is critical - `w_rx_data` is only valid for one cycle.
 
 **WAIT_TX** - Waiting for transmitter
 ```verilog
 WAIT_TX: begin
-  if (!tx_busy) begin
-    tx_data  <= echo_data;
-    tx_start <= 1;
-    state    <= SENDING;
+  if (!w_tx_busy) begin
+    r_tx_data  <= r_echo_data;
+    r_tx_start <= 1;
+    r_state    <= SENDING;
   end
 end
 ```
@@ -148,10 +148,10 @@ We wait until the transmitter is free, then start transmission. If we didn't hav
 **SENDING** - Waiting for transmission to complete
 ```verilog
 SENDING: begin
-  if (tx_busy) begin
+  if (w_tx_busy) begin
     // TX started, wait for completion
   end else begin
-    state <= IDLE;
+    r_state <= IDLE;
   end
 end
 ```
@@ -161,20 +161,20 @@ We wait for `tx_busy` to go high (transmission started), then wait for it to go 
 ### The Capture Buffer
 
 ```verilog
-reg [7:0] echo_data;
+reg [7:0] r_echo_data;
 ```
 
-This single register is our buffer. It holds the received byte while we wait for TX. Without it:
+This single register (note the `r_` prefix) is our buffer. It holds the received byte while we wait for TX. Without it:
 
 ```
 // BAD - race condition
-if (rx_valid && !tx_busy) begin
-  tx_data  <= rx_data;   // rx_data might change!
-  tx_start <= 1;
+if (w_rx_valid && !w_tx_busy) begin
+  r_tx_data  <= w_rx_data;   // w_rx_data might change!
+  r_tx_start <= 1;
 end
 ```
 
-The problem: by the time TX finishes and we try to send another byte, `rx_data` has already changed (or become invalid).
+The problem: by the time TX finishes and we try to send another byte, `w_rx_data` has already changed (or become invalid).
 
 ### Why Not a FIFO?
 
@@ -204,48 +204,48 @@ The top module just wires them together with glue logic. This is **hierarchical 
 When the user presses backspace, the terminal (with local echo) already moves the cursor left. We need to overwrite the previous character and move back. We send two characters: Space (overwrite), BS (move back).
 
 ```verilog
-wire is_backspace = (rx_data == 8'h08) || (rx_data == 8'h7F);
+wire w_is_backspace = (w_rx_data == 8'h08) || (w_rx_data == 8'h7F);
 
 SEND_BS: begin
-  if (!tx_busy) begin
-    tx_data  <= bs_step ? 8'h08 : 8'h20;  // 0=Space, 1=BS
-    tx_start <= 1;
-    if (bs_step)
-      state <= SENDING;
+  if (!w_tx_busy) begin
+    r_tx_data  <= r_bs_step ? 8'h08 : 8'h20;  // 0=Space, 1=BS
+    r_tx_start <= 1;
+    if (r_bs_step)
+      r_state <= SENDING;
     else
-      bs_step <= 1;
+      r_bs_step <= 1;
   end
 end
 ```
 
-The `bs_step` flag tracks which character we're sending. We check for both 0x08 (BS) and 0x7F (DEL) since terminals vary.
+The `r_bs_step` flag tracks which character we're sending. We check for both 0x08 (BS) and 0x7F (DEL) since terminals vary.
 
 ### CR to CR+LF Conversion
 
 Terminals send only CR (carriage return, 0x0D) when you press Enter. To move to a new line, we need to send both CR and LF (line feed, 0x0A).
 
 ```verilog
-need_lf <= (rx_data == 8'h0D);  // Flag if CR received
+r_need_lf <= (w_rx_data == 8'h0D);  // Flag if CR received
 ```
 
 The state machine checks this flag after sending a character:
 
 ```verilog
 SENDING: begin
-  if (!tx_busy) begin
-    if (need_lf)
-      state <= SEND_LF;   // Go send LF
+  if (!w_tx_busy) begin
+    if (r_need_lf)
+      r_state <= SEND_LF;   // Go send LF
     else
-      state <= IDLE;      // Done
+      r_state <= IDLE;      // Done
   end
 end
 
 SEND_LF: begin
-  if (!tx_busy) begin
-    tx_data  <= 8'h0A;    // LF
-    tx_start <= 1;
-    need_lf  <= 0;
-    state    <= SENDING;  // Wait for LF to finish
+  if (!w_tx_busy) begin
+    r_tx_data  <= 8'h0A;    // LF
+    r_tx_start <= 1;
+    r_need_lf  <= 0;
+    r_state    <= SENDING;  // Wait for LF to finish
   end
 end
 ```
