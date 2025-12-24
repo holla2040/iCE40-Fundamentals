@@ -14,7 +14,11 @@
 
 ## Repository Structure
 ```
-├── src/           # Project source code (all projects here)
+├── src/           # Project source code
+│   ├── io/        # Digital I/O projects (blink, button_debounce, pwm_led, frequency_counter)
+│   ├── serial/    # UART projects (tx, rx, echo)
+│   ├── adc/       # ADC projects (spi/ad7476, i2c/ads1115_*)
+│   └── dac/       # DAC projects (spi/dac121s101)
 ├── config/        # Build configuration
 │   └── common.mk
 ├── docs/          # Datasheets and reference

@@ -1,5 +1,5 @@
 // Test Frequency Generator
-// Generates a 500 kHz square wave for testing the frequency counter
+// Generates a 6.25 MHz square wave for testing the frequency counter
 // Connect io_PMOD_10 to io_PMOD_7 with a jumper wire to test
 
 module test_freq_gen (
@@ -7,12 +7,11 @@ module test_freq_gen (
   output reg  o_Freq_Out  // Test frequency output
 );
 
-  // Generate 500,000 Hz from 25 MHz clock (exact division)
-  // 25,000,000 / 500,000 = 50 cycles per period
-  // Toggle every 25 cycles for 50% duty cycle
-  localparam HALF_PERIOD = 25 - 1;
+  // Generate 6.25 MHz from 25 MHz clock (50% duty cycle)
+  // 25 MHz / 4 = 6.25 MHz, toggle every 2 cycles
+  localparam HALF_PERIOD = 2 - 1;
 
-  reg [4:0] counter = 0;
+  reg [0:0] counter = 0;
 
   always @(posedge i_Clk) begin
     if (counter >= HALF_PERIOD) begin
