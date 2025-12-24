@@ -2,4 +2,4 @@
 PROJ = serial_top
 SRCS = serial_top.v uart_tx.v
 
-include ../../config/common.mk
+include ../../../config/common.mk
