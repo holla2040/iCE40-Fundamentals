@@ -216,10 +216,10 @@ module ads1115_top (
       led_cnt <= led_cnt - 1;
 
   // LED1: blinks on each reading
-  // LED2-4: upper bits of ADC value (shows magnitude)
+  // LED2-4: bar graph (thresholds at 25%, 50%, 75% of 0-0x7FFF range)
   assign o_LED_1 = adc_error ? 1'b1 : led_cnt[23];
-  assign o_LED_2 = adc_error ? 1'b1 : adc_data[15];
-  assign o_LED_3 = adc_error ? 1'b1 : adc_data[14];
-  assign o_LED_4 = adc_error ? 1'b1 : adc_data[13];
+  assign o_LED_2 = adc_error ? 1'b1 : (adc_data >= 16'h2000);
+  assign o_LED_3 = adc_error ? 1'b1 : (adc_data >= 16'h4000);
+  assign o_LED_4 = adc_error ? 1'b1 : (adc_data >= 16'h6000);
 
 endmodule

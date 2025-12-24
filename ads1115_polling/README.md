@@ -33,9 +33,9 @@ Note: ALERT/RDY pin is not used in this version.
 | o_ADDR      | 64  | Output    | ADS1115 address pin  |
 | o_UART_TX   | 74  | Output    | UART serial output   |
 | o_LED_1     | 56  | Output    | Blinks on reading    |
-| o_LED_2     | 57  | Output    | ADC bit 15           |
-| o_LED_3     | 59  | Output    | ADC bit 14           |
-| o_LED_4     | 60  | Output    | ADC bit 13           |
+| o_LED_2     | 57  | Output    | Bar graph >= 25%     |
+| o_LED_3     | 59  | Output    | Bar graph >= 50%     |
+| o_LED_4     | 60  | Output    | Bar graph >= 75%     |
 
 ## UART Output
 
