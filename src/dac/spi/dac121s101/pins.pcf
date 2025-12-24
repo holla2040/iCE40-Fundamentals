@@ -1,17 +1,13 @@
-# DAC Project - Pin Constraints
-# Target: Nandland Go Board (iCE40HX1K-VQ100)
+# DAC121S101 SPI DAC - Pin Constraints
+# Signal names from docs/pins_nandland_go.pcf
 
-# Clock - 25 MHz
-set_io clk 15
+set_io i_Clk 15
 
-# Trigger input (rising edge starts sweep)
-set_io trigger_in 53    # Switch 1
+set_io i_Switch_1 53
 
-# DAC SPI (DAC121S101) - PMOD connector
-set_io dac_cs_n  65     # PMOD 1
-set_io dac_sclk  64     # PMOD 2
-set_io dac_mosi  63     # PMOD 3
+set_io io_PMOD_1 65
+set_io io_PMOD_2 64
+set_io io_PMOD_3 63
 
-# Status outputs - LEDs
-set_io busy 56          # LED 1
-set_io done 57          # LED 2
+set_io o_LED_1 56
+set_io o_LED_2 57

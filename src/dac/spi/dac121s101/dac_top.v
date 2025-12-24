@@ -5,46 +5,51 @@
 // - Pin 55 rising edge starts sweep
 
 module top (
-  input  wire clk,              // 12 MHz clock
-  
+  input  wire i_Clk,            // 25 MHz clock
+
   // Trigger input
-  input  wire trigger_in,       // Pin 55 - rising edge starts sweep
-  
-  // DAC SPI Master (to DAC121S101)
-  output wire dac_cs_n,
-  output wire dac_sclk,
-  output wire dac_mosi,
-  
-  // Status
-  output wire busy,
-  output wire done
+  input  wire i_Switch_1,       // Rising edge starts sweep
+
+  // DAC SPI Master (to DAC121S101) - PMOD connector
+  output wire io_PMOD_1,        // CS_n
+  output wire io_PMOD_2,        // SCLK
+  output wire io_PMOD_3,        // MOSI
+
+  // Status LEDs
+  output wire o_LED_1,          // Busy
+  output wire o_LED_2           // Done
 );
 
   // Reset generator
   reg [7:0] reset_cnt = 8'd0;
   wire rst_n = reset_cnt[7];
-  
-  always @(posedge clk) begin
+
+  always @(posedge i_Clk) begin
     if (!reset_cnt[7])
       reset_cnt <= reset_cnt + 1;
   end
 
   // Trigger edge detect
   reg [2:0] trigger_sync;
-  always @(posedge clk) begin
-    trigger_sync <= {trigger_sync[1:0], trigger_in};
+  always @(posedge i_Clk) begin
+    trigger_sync <= {trigger_sync[1:0], i_Switch_1};
   end
   wire trigger_rise = (trigger_sync[2:1] == 2'b01);
 
   // Sweep control
+  wire busy, done;
   wire sweep_start = trigger_rise && !busy;
   wire dac_start;
   wire [11:0] dac_data;
   wire dac_done;
 
+  // Map to LED outputs
+  assign o_LED_1 = busy;
+  assign o_LED_2 = done;
+
   // DAC Sweep Controller
   dac_sweep u_sweep (
-    .clk      (clk),
+    .clk      (i_Clk),
     .rst_n    (rst_n),
     .start    (sweep_start),
     .busy     (busy),
@@ -54,9 +59,15 @@ module top (
     .dac_done (dac_done)
   );
 
+  // Internal SPI signals
+  wire dac_cs_n, dac_sclk, dac_mosi;
+  assign io_PMOD_1 = dac_cs_n;
+  assign io_PMOD_2 = dac_sclk;
+  assign io_PMOD_3 = dac_mosi;
+
   // DAC SPI Master
   dac_spi u_dac (
-    .clk      (clk),
+    .clk      (i_Clk),
     .rst_n    (rst_n),
     .start    (dac_start),
     .data     (dac_data),

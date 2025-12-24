@@ -6,46 +6,51 @@
 // - Store results in memory
 
 module top (
-  input  wire clk,              // 12 MHz clock
-  
+  input  wire i_Clk,            // 25 MHz clock
+
   // Trigger input
-  input  wire trigger_in,       // Pin 54 - rising edge starts sweep
-  
-  // ADC SPI Master (to AD7476A)
-  output wire adc_cs_n,
-  output wire adc_sclk,
-  input  wire adc_miso,
-  
-  // Status
-  output wire busy,
-  output wire done
+  input  wire i_Switch_3,       // Rising edge starts sweep
+
+  // ADC SPI Master (to AD7476A) - PMOD connector
+  output wire io_PMOD_7,        // CS_n
+  output wire io_PMOD_8,        // SCLK
+  input  wire io_PMOD_9,        // MISO
+
+  // Status LEDs
+  output wire o_LED_3,          // Busy
+  output wire o_LED_4           // Done
 );
 
   // Reset generator
   reg [7:0] reset_cnt = 8'd0;
   wire rst_n = reset_cnt[7];
-  
-  always @(posedge clk) begin
+
+  always @(posedge i_Clk) begin
     if (!reset_cnt[7])
       reset_cnt <= reset_cnt + 1;
   end
 
   // Trigger edge detect
   reg [2:0] trigger_sync;
-  always @(posedge clk) begin
-    trigger_sync <= {trigger_sync[1:0], trigger_in};
+  always @(posedge i_Clk) begin
+    trigger_sync <= {trigger_sync[1:0], i_Switch_3};
   end
   wire trigger_rise = (trigger_sync[2:1] == 2'b01);
 
   // Sweep control
+  wire busy, done;
   wire sweep_start = trigger_rise && !busy;
   wire adc_start;
   wire [11:0] adc_data;
   wire adc_done;
 
+  // Map to LED outputs
+  assign o_LED_3 = busy;
+  assign o_LED_4 = done;
+
   // ADC Sweep Controller
   adc_sweep u_sweep (
-    .clk      (clk),
+    .clk      (i_Clk),
     .rst_n    (rst_n),
     .start    (sweep_start),
     .busy     (busy),
@@ -55,16 +60,21 @@ module top (
     .adc_done (adc_done)
   );
 
+  // Internal SPI signals
+  wire adc_cs_n, adc_sclk;
+  assign io_PMOD_7 = adc_cs_n;
+  assign io_PMOD_8 = adc_sclk;
+
   // ADC SPI Master
   adc_spi u_adc (
-    .clk      (clk),
+    .clk      (i_Clk),
     .rst_n    (rst_n),
     .start    (adc_start),
     .data     (adc_data),
     .done     (adc_done),
     .adc_cs_n (adc_cs_n),
     .adc_sclk (adc_sclk),
-    .adc_miso (adc_miso)
+    .adc_miso (io_PMOD_9)
   );
 
 endmodule

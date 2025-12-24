@@ -1,15 +1,14 @@
-# ADS1115 I2C ADC (Polling) - Pin Constraints
+# Frequency Counter Pin Constraints
 # Signal names from docs/pins_nandland_go.pcf
 
 set_io i_Clk 15
-
-set_io io_PMOD_2 64
-set_io io_PMOD_3 63
-set_io io_PMOD_4 62
-
-set_io o_UART_TX 74
 
 set_io o_LED_1 56
 set_io o_LED_2 57
 set_io o_LED_3 59
 set_io o_LED_4 60
+
+set_io o_UART_TX 74
+
+set_io io_PMOD_7 78
+set_io io_PMOD_10 81

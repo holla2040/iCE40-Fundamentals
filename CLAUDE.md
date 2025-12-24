@@ -16,19 +16,22 @@
 ```
 ├── src/           # Project source code (all projects here)
 ├── config/        # Build configuration
-│   ├── common.mk
-│   └── nandland_go_template.pcf
-├── docs/          # Datasheets
+│   └── common.mk
+├── docs/          # Datasheets and reference
+│   └── pins_nandland_go.pcf  # Master pin definitions (matches schematic)
 └── other/         # Legacy/reference material
 ```
 
 ## Project Structure
 Each project directory in `src/` must contain:
 - `*.v` - Verilog source files
-- `pins.pcf` - Pin constraint file
+- `pins.pcf` - Pin constraint file (subset of docs/pins_nandland_go.pcf)
 - `Makefile` - Build with `make`, flash with `make flash`
 - `README.md` - Brief description, pin table, usage
 - `TUTORIAL.md` - Beginner-friendly Verilog explanation
+
+## Pin Naming Convention
+All projects MUST use signal names from `docs/pins_nandland_go.pcf`. This ensures consistency with the board schematic. Each project's `pins.pcf` should be a subset containing only the pins used by that project.
 
 ## Build Commands
 ```bash

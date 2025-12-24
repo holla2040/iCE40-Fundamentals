@@ -5,9 +5,9 @@ module ads1115_top (
   input  wire i_Clk,
 
   // I2C (directly to PMOD)
-  output wire io_I2C_SCL,
-  output wire io_I2C_SDA,
-  output wire o_ADDR,
+  inout  wire io_PMOD_4,        // SCL
+  inout  wire io_PMOD_3,        // SDA
+  output wire io_PMOD_2,        // ADDR
 
   // UART
   output wire o_UART_TX,
@@ -47,7 +47,7 @@ module ads1115_top (
     .PIN_TYPE(6'b1010_01),
     .PULLUP(1'b1)
   ) sda_io (
-    .PACKAGE_PIN(io_I2C_SDA),
+    .PACKAGE_PIN(io_PMOD_3),
     .OUTPUT_ENABLE(!sda_out),  // Drive low when sda_out=0
     .D_OUT_0(1'b0),
     .D_IN_0(sda_in)
@@ -58,14 +58,14 @@ module ads1115_top (
     .PIN_TYPE(6'b1010_01),
     .PULLUP(1'b1)
   ) scl_io (
-    .PACKAGE_PIN(io_I2C_SCL),
+    .PACKAGE_PIN(io_PMOD_4),
     .OUTPUT_ENABLE(!scl_out),  // Drive low when scl_out=0
     .D_OUT_0(1'b0)
   );
 
   // ADDR pin directly controls ADS1115 address
   // Low = 0x48, High = 0x49
-  assign o_ADDR = 1'b0;
+  assign io_PMOD_2 = 1'b0;
 
   // ADS1115 driver
   ads1115 #(
