@@ -27,7 +27,8 @@ $(JSON): $(SRCS) $(DEPS) | $(BUILDDIR)
 	yosys -q -p "read_verilog $(SRCS); synth_ice40 -top $(TOP) -json $@"
 
 $(ASC): $(JSON) $(PCF) | $(BUILDDIR)
-	nextpnr-ice40 -q --$(DEVICE) --package $(PACKAGE) --json $< --pcf $(PCF) --asc $@
+	@nextpnr-ice40 -q --$(DEVICE) --package $(PACKAGE) --json $< --pcf $(PCF) --asc $@ --log $(BUILDDIR)/nextpnr.log
+	@sed -n '/Device utilisation/,/^$$/p' $(BUILDDIR)/nextpnr.log
 
 $(BIN): $(ASC)
 	icepack $< $@
