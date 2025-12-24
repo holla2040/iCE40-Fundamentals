@@ -2,4 +2,4 @@
 PROJ = dac_top
 DEPS = ramp.mem
 
-include ../common.mk
+include ../../../../config/common.mk

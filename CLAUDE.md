@@ -12,8 +12,18 @@
 - **Board**: Nandland Go Board
 - **Clock**: 25 MHz
 
+## Repository Structure
+```
+├── src/           # Project source code (all projects here)
+├── config/        # Build configuration
+│   ├── common.mk
+│   └── nandland_go_template.pcf
+├── docs/          # Datasheets
+└── other/         # Legacy/reference material
+```
+
 ## Project Structure
-Each project directory must contain:
+Each project directory in `src/` must contain:
 - `*.v` - Verilog source files
 - `pins.pcf` - Pin constraint file
 - `Makefile` - Build with `make`, flash with `make flash`
@@ -22,7 +32,8 @@ Each project directory must contain:
 
 ## Build Commands
 ```bash
-make        # Build bitstream
+cd src/<project>
+make        # Build bitstream (outputs to /tmp/build/<project>/)
 make flash  # Program FPGA
 make clean  # Remove build artifacts
 ```
@@ -41,7 +52,7 @@ set_io signal_name pin_number
 IMPORTANT: After ANY Verilog (.v) or constraint (.pcf) changes, run `make` in the project directory to verify compilation succeeds. Do not consider a change complete until it compiles without errors.
 
 ```bash
-cd <project_dir> && make
+cd src/<project_dir> && make
 ```
 
 Fix any synthesis or place-and-route errors before proceeding.

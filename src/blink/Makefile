@@ -2,4 +2,4 @@
 PROJ = blink
 TOP = $(PROJ)
 
-include ../common.mk
+include ../../config/common.mk

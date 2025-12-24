@@ -8,19 +8,25 @@ PCF ?= pins.pcf
 TOP ?= top
 DEPS ?=
 
-# Build outputs
-JSON = $(PROJ).json
-ASC = $(PROJ).asc
-BIN = $(PROJ).bin
+# Build output directory
+BUILDDIR = /tmp/build/$(PROJ)
+
+# Build outputs (in temp directory)
+JSON = $(BUILDDIR)/$(PROJ).json
+ASC = $(BUILDDIR)/$(PROJ).asc
+BIN = $(BUILDDIR)/$(PROJ).bin
 
 .PHONY: all flash clean
 
 all: $(BIN)
 
-$(JSON): $(SRCS) $(DEPS)
+$(BUILDDIR):
+	mkdir -p $@
+
+$(JSON): $(SRCS) $(DEPS) | $(BUILDDIR)
 	yosys -q -p "read_verilog $(SRCS); synth_ice40 -top $(TOP) -json $@"
 
-$(ASC): $(JSON) $(PCF)
+$(ASC): $(JSON) $(PCF) | $(BUILDDIR)
 	nextpnr-ice40 -q --$(DEVICE) --package $(PACKAGE) --json $< --pcf $(PCF) --asc $@
 
 $(BIN): $(ASC)
@@ -30,4 +36,4 @@ flash: $(BIN)
 	iceprog $<
 
 clean:
-	rm -f $(JSON) $(ASC) $(BIN)
+	rm -rf $(BUILDDIR)
