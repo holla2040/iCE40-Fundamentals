@@ -1,6 +1,8 @@
 # Lattice iCE40 FPGA Projects
 
-Minimal example projects for Lattice iCE40 development boards.
+Learn FPGA development with minimal, well-documented example projects for the Lattice iCE40.
+
+**Designed for use with [Claude Code](https://claude.ai/claude-code)** - an AI coding assistant that understands this codebase and can help you build, modify, and learn from these projects.
 
 ## Hardware
 
@@ -82,3 +84,11 @@ make        # Build bitstream (outputs to /tmp/build/<project>/)
 make flash  # Program FPGA
 make clean  # Remove build artifacts
 ```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`docs/UNDERSTANDING_THE_CODE.md`](docs/UNDERSTANDING_THE_CODE.md) | Guide to reading and understanding the Verilog code |
+| [`docs/pins_nandland_go.pcf`](docs/pins_nandland_go.pcf) | Master pin definitions for the Go Board |
+| Each project's `TUTORIAL.md` | Beginner-friendly explanation of that project |

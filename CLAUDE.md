@@ -52,7 +52,36 @@ set_io signal_name pin_number
 
 ## Code Style
 
+Follow these conventions for all Verilog code:
+
+### Formatting
 - **Indentation**: 2 spaces (no tabs)
+- **Line length**: 80 characters preferred, 100 max
+
+### Naming Conventions
+| Prefix | Usage | Example |
+|--------|-------|---------|
+| `i_` | Input ports | `i_Clk`, `i_Switch_1` |
+| `o_` | Output ports | `o_LED_1`, `o_UART_TX` |
+| `r_` | Registers | `r_Count`, `r_State` |
+| `w_` | Wires | `w_Rx_Valid`, `w_Output` |
+| `UPPERCASE` | Constants/parameters | `CLK_FREQ`, `BAUD_RATE` |
+| `S_` or `UPPERCASE` | State machine states | `S_IDLE`, `START_BIT` |
+
+### Sequential Logic
+- Use synchronous reset (iCE40 has no dedicated reset routing)
+- Use non-blocking assignment (`<=`) in `always @(posedge clk)` blocks
+- Reset all registers in the reset block
+
+### Combinational Logic
+- Use blocking assignment (`=`) in `always @*` blocks and `assign` statements
+- Every `case` statement must have a `default`
+
+### Module Instantiation
+- Always use named port connections (`.port(signal)`)
+- Never use positional arguments
+
+See `docs/UNDERSTANDING_THE_CODE.md` for detailed explanations of these conventions.
 
 ## Development Rules
 
