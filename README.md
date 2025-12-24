@@ -15,12 +15,30 @@ Minimal example projects for Lattice iCE40 development boards.
 ```
 ├── src/           # Project source code
 │   ├── io/        # Digital I/O projects
+│   │   ├── blink/
+│   │   ├── button_debounce/
+│   │   ├── frequency_counter/
+│   │   └── pwm_led/
 │   ├── serial/    # UART serial projects
+│   │   ├── echo/
+│   │   ├── rx/
+│   │   └── tx/
 │   ├── adc/       # Analog-to-Digital converter projects
+│   │   ├── i2c/
+│   │   │   ├── ads1115_interrupt/
+│   │   │   └── ads1115_polling/
+│   │   └── spi/
+│   │       └── ad7476/
 │   └── dac/       # Digital-to-Analog converter projects
-├── config/        # Build configuration (common.mk)
+│       └── spi/
+│           └── dac121s101/
+├── config/        # Build configuration
+│   └── common.mk
 ├── docs/          # Datasheets and reference
+│   └── pins_nandland_go.pcf
 └── other/         # Legacy/reference material
+    ├── icestudio/
+    └── tutorial_original/
 ```
 
 ## Projects
